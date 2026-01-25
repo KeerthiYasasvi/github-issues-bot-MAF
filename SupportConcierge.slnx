@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SupportConcierge.Cli/SupportConcierge.Cli.csproj" />
+    <Project Path="src/SupportConcierge.Core/SupportConcierge.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SupportConcierge.Tests/SupportConcierge.Tests.csproj" />
+  </Folder>
+</Solution>

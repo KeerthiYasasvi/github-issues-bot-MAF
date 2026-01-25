@@ -1,0 +1,13 @@
+{
+  "name": "build_brief_basic",
+  "category": "build",
+  "issueBody": "Build fails on Ubuntu 22.04 with error CS1002. Using dotnet build.",
+  "extractedFields": {
+    "operating_system": "Ubuntu 22.04",
+    "build_command": "dotnet build",
+    "error_message": "error CS1002: ; expected",
+    "build_tool_version": "dotnet 8.0.1"
+  },
+  "playbook": "Capture build command, toolchain version, and error output. Suggest clean restore if appropriate.",
+  "repoDocs": "README: Build with dotnet build and ensure .NET 8 SDK is installed."
+}

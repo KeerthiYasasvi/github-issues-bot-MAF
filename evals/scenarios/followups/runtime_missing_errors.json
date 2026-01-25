@@ -1,0 +1,7 @@
+{
+  "name": "runtime_missing_errors",
+  "category": "runtime",
+  "issueBody": "App crashes when I click Sync. Happens on Windows 11 with .NET 8.",
+  "missingFields": ["error_message", "stack_trace", "steps_to_reproduce"],
+  "askedBefore": []
+}

@@ -1,0 +1,27 @@
+{
+  "name": "build_missing_details",
+  "eventName": "issues",
+  "issue": {
+    "number": 12,
+    "title": "Build fails on Ubuntu",
+    "body": "## Operating System\nUbuntu 22.04\n\n## Version\n1.4.0\n\n## Description\nBuild fails when I run the project locally.",
+    "user": { "login": "alice" },
+    "state": "open",
+    "labels": [],
+    "assignees": [],
+    "html_url": "https://github.com/octo-org/sample-repo/issues/12"
+  },
+  "repository": {
+    "name": "sample-repo",
+    "owner": { "login": "octo-org" },
+    "full_name": "octo-org/sample-repo",
+    "default_branch": "main"
+  },
+  "comments": [],
+  "specPackPath": "evals/specpack.json",
+  "expectations": {
+    "expectedDecision": "follow_up",
+    "expectedCategory": "build",
+    "minFollowUpQuestions": 0
+  }
+}

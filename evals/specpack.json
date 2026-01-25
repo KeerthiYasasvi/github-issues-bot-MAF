@@ -1,0 +1,153 @@
+{
+  "categories": [
+    {
+      "name": "setup",
+      "description": "Installation, configuration, or initial setup issues",
+      "keywords": ["install", "setup", "configure", "getting started", "initialization", "permission", "access denied", "docker-compose"]
+    },
+    {
+      "name": "build",
+      "description": "Compilation, build errors, or dependency issues",
+      "keywords": ["build", "compile", "dependency", "npm", "package", "missing module", "syntax error", "cannot find", "requirements.txt"]
+    },
+    {
+      "name": "runtime",
+      "description": "Runtime errors, crashes, or unexpected behavior during execution",
+      "keywords": ["crash", "exception", "error at runtime", "stack trace", "segfault", "panic", "unexpected behavior", "throws"]
+    },
+    {
+      "name": "bug",
+      "description": "Functional bugs or incorrect behavior",
+      "keywords": ["bug", "incorrect", "wrong result", "not working", "broken", "regression", "failed test"]
+    },
+    {
+      "name": "docs",
+      "description": "Documentation issues, typos, or missing information",
+      "keywords": ["documentation", "readme", "typo", "example", "tutorial", "guide", "clarification"]
+    },
+    {
+      "name": "off_topic",
+      "description": "Issues unrelated to this repository or general support requests",
+      "keywords": ["unrelated", "off topic", "off-topic", "not about this repo", "different project", "wrong repository", "homework", "assignment", "general question", "how to", "how do i", "how can i", "how to build", "how do i build", "how to run", "how do i run", "run locally", "build locally", "clone", "cloning", "install instructions", "installation steps", "setup guide", "getting started", "build instructions"]
+    }
+  ],
+  "checklists": {
+    "setup": {
+      "category": "setup",
+      "completenessThreshold": 70,
+      "requiredFields": [
+        { "name": "operating_system", "description": "OS and version where setup runs", "weight": 15, "aliases": ["os", "platform"] },
+        { "name": "version", "description": "App or package version", "weight": 15, "aliases": ["app_version", "package_version"] },
+        { "name": "installation_method", "description": "How the install was performed", "weight": 20, "aliases": ["install_method", "install_steps"] },
+        { "name": "error_message", "description": "Exact error message from setup", "weight": 25, "aliases": ["error", "failure"] },
+        { "name": "steps_to_reproduce", "description": "Steps to reproduce the setup failure", "weight": 25, "aliases": ["repro_steps", "reproduction_steps"] }
+      ]
+    },
+    "build": {
+      "category": "build",
+      "completenessThreshold": 70,
+      "requiredFields": [
+        { "name": "operating_system", "description": "OS and version where build runs", "weight": 10, "aliases": ["os", "platform"] },
+        { "name": "build_command", "description": "Command used to build", "weight": 20, "aliases": ["compile_command", "build_step"] },
+        { "name": "build_log", "description": "Build output or log snippet", "weight": 20, "optional": true, "aliases": ["build_output", "build_errors"] },
+        { "name": "error_message", "description": "Exact compiler or build error", "weight": 20, "aliases": ["error", "failure"] },
+        { "name": "version", "description": "App or package version", "weight": 15, "optional": true, "aliases": ["app_version", "package_version"] },
+        { "name": "build_tool_version", "description": "Toolchain version", "weight": 15, "optional": true, "aliases": ["toolchain_version", "compiler_version"] }
+      ]
+    },
+    "runtime": {
+      "category": "runtime",
+      "completenessThreshold": 75,
+      "requiredFields": [
+        { "name": "operating_system", "description": "OS and version where runtime error occurs", "weight": 10, "aliases": ["os", "platform"] },
+        { "name": "runtime_version", "description": "Runtime version", "weight": 15, "aliases": ["framework_version", "sdk_version"] },
+        { "name": "error_message", "description": "Exact runtime error message", "weight": 20, "aliases": ["error", "exception"] },
+        { "name": "stack_trace", "description": "Stack trace or crash log", "weight": 20, "aliases": ["trace", "backtrace"] },
+        { "name": "steps_to_reproduce", "description": "Steps to reproduce the runtime issue", "weight": 15, "aliases": ["repro_steps", "reproduction_steps"] },
+        { "name": "expected_behavior", "description": "What should happen instead", "weight": 10, "aliases": ["expected", "expected_result"] },
+        { "name": "actual_behavior", "description": "What actually happens", "weight": 10, "aliases": ["actual", "actual_result"] }
+      ]
+    },
+    "bug": {
+      "category": "bug",
+      "completenessThreshold": 70,
+      "requiredFields": [
+        { "name": "steps_to_reproduce", "description": "Minimal repro steps", "weight": 25, "aliases": ["repro_steps", "reproduction_steps"] },
+        { "name": "expected_behavior", "description": "Expected outcome", "weight": 20, "aliases": ["expected", "expected_result"] },
+        { "name": "actual_behavior", "description": "Actual outcome", "weight": 20, "aliases": ["actual", "actual_result"] },
+        { "name": "version", "description": "App or package version", "weight": 15, "aliases": ["app_version", "package_version"] },
+        { "name": "operating_system", "description": "OS and version", "weight": 10, "aliases": ["os", "platform"] },
+        { "name": "screenshots", "description": "UI or output screenshots", "weight": 10, "optional": true, "aliases": ["screen", "screenshot"] }
+      ]
+    },
+    "docs": {
+      "category": "docs",
+      "completenessThreshold": 60,
+      "requiredFields": [
+        { "name": "doc_location", "description": "Location of the documentation issue", "weight": 30, "aliases": ["doc_page", "page", "url"] },
+        { "name": "issue_description", "description": "Description of the docs problem", "weight": 30, "aliases": ["doc_issue", "problem"] },
+        { "name": "version", "description": "Doc or product version", "weight": 20, "optional": true, "aliases": ["app_version", "package_version"] },
+        { "name": "screenshots", "description": "Screenshot of the docs issue", "weight": 20, "optional": true, "aliases": ["screen", "screenshot"] }
+      ]
+    },
+    "off_topic": {
+      "category": "off_topic",
+      "completenessThreshold": 0,
+      "requiredFields": []
+    }
+  },
+  "validators": {
+    "junkPatterns": [
+      "^(n/?a|na|none|unknown|tbd|todo|nil|n\\\\a)$",
+      "^\\?+$",
+      "^-$",
+      "^none provided$"
+    ],
+    "formatValidators": {
+      "version": "(?i).*\\\\d+.*",
+      "runtime_version": "(?i).*\\\\d+.*",
+      "build_tool_version": "(?i).*\\\\d+.*",
+      "operating_system": "(?i)(windows|mac|linux|ubuntu|debian|alpine|centos|rhel|fedora|darwin)"
+    },
+    "secretPatterns": [
+      "(?i)gh[pousr]_[A-Za-z0-9]{20,}",
+      "(?i)sk-[A-Za-z0-9]{20,}",
+      "(?i)xox[baprs]-[A-Za-z0-9-]{10,}",
+      "(?i)(api[_-]?key|secret|token|password)\\\\s*[:=]\\\\s*\\\\S+"
+    ],
+    "contradictionRules": [
+      {
+        "name": "runtime_vs_app_version",
+        "description": "Runtime version far from app version",
+        "field1": "runtime_version",
+        "field2": "version",
+        "condition": "version_mismatch"
+      },
+      {
+        "name": "windows_bash",
+        "description": "Bash command on Windows without WSL",
+        "field1": "operating_system",
+        "field2": "build_command",
+        "condition": "windows_with_bash_native"
+      }
+    ]
+  },
+  "routing": {
+    "routes": [
+      { "category": "setup", "labels": ["supportbot:setup"], "assignees": [] },
+      { "category": "build", "labels": ["supportbot:build"], "assignees": [] },
+      { "category": "runtime", "labels": ["supportbot:runtime"], "assignees": [] },
+      { "category": "bug", "labels": ["supportbot:bug"], "assignees": [] },
+      { "category": "docs", "labels": ["supportbot:docs"], "assignees": [] }
+    ],
+    "escalationMentions": ["@maintainers"]
+  },
+  "playbooks": {
+    "setup": "Confirm OS and version. Capture install method and error. Verify prerequisites and permissions.",
+    "build": "Capture build command, toolchain version, and error output. Suggest clean restore if appropriate.",
+    "runtime": "Capture runtime version, error message, stack trace, and repro steps.",
+    "bug": "Capture repro steps, expected vs actual, and version.",
+    "docs": "Capture doc location and describe the problem.",
+    "off_topic": "Redirect to docs or proper support channel."
+  }
+}

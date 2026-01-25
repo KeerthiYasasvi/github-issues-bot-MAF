@@ -1,0 +1,7 @@
+{
+  "name": "docs_missing_location",
+  "category": "docs",
+  "issueBody": "The setup guide is confusing and missing a step.",
+  "missingFields": ["doc_location", "issue_description"],
+  "askedBefore": []
+}

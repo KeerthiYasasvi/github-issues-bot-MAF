@@ -1,0 +1,16 @@
+{
+  "name": "runtime_brief_basic",
+  "category": "runtime",
+  "issueBody": "Unhandled exception: System.InvalidOperationException: Sequence contains no elements. Occurs on Windows 11 with .NET 8.0.1 when clicking Sync.",
+  "extractedFields": {
+    "operating_system": "Windows 11",
+    "runtime_version": ".NET 8.0.1",
+    "error_message": "Unhandled exception: System.InvalidOperationException: Sequence contains no elements",
+    "stack_trace": "System.InvalidOperationException: Sequence contains no elements",
+    "steps_to_reproduce": "1. Run app\n2. Click Sync",
+    "expected_behavior": "Sync completes successfully",
+    "actual_behavior": "App crashes"
+  },
+  "playbook": "Capture runtime version, error message, stack trace, and repro steps.",
+  "repoDocs": "README: To run the app, use dotnet run and click Sync to start the process."
+}

@@ -1,0 +1,19 @@
+routes:
+  - category: setup
+    labels: [supportbot:setup]
+    assignees: []
+  - category: build
+    labels: [supportbot:build]
+    assignees: []
+  - category: runtime
+    labels: [supportbot:runtime]
+    assignees: []
+  - category: bug
+    labels: [supportbot:bug]
+    assignees: []
+  - category: docs
+    labels: [supportbot:docs]
+    assignees: []
+
+escalation_mentions:
+  - '@maintainers'

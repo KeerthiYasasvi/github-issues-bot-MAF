@@ -1,0 +1,8 @@
+{
+  "minFollowUpScore": 3,
+  "minBriefScore": 3,
+  "minCompletenessScore": 50,
+  "maxAverageLatencyMs": 8000,
+  "maxAverageTokens": 4000,
+  "failOnHallucinations": true
+}

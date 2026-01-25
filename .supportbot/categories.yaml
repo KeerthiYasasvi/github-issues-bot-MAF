@@ -1,0 +1,88 @@
+categories:
+  - name: setup
+    description: Installation, configuration, or initial setup issues
+    keywords:
+      - install
+      - setup
+      - configure
+      - getting started
+      - initialization
+      - permission
+      - access denied
+      - docker-compose
+
+  - name: build
+    description: Compilation, build errors, or dependency issues
+    keywords:
+      - build
+      - compile
+      - dependency
+      - npm
+      - package
+      - missing module
+      - syntax error
+      - cannot find
+      - requirements.txt
+
+  - name: runtime
+    description: Runtime errors, crashes, or unexpected behavior during execution
+    keywords:
+      - crash
+      - exception
+      - error at runtime
+      - stack trace
+      - segfault
+      - panic
+      - unexpected behavior
+      - throws
+
+  - name: bug
+    description: Functional bugs or incorrect behavior
+    keywords:
+      - bug
+      - incorrect
+      - wrong result
+      - not working
+      - broken
+      - regression
+      - failed test
+
+  - name: docs
+    description: Documentation issues, typos, or missing information
+    keywords:
+      - documentation
+      - readme
+      - typo
+      - example
+      - tutorial
+      - guide
+      - clarification
+
+  - name: off_topic
+    description: Issues unrelated to this repository or general support requests
+    keywords:
+      - unrelated
+      - off topic
+      - off-topic
+      - not about this repo
+      - different project
+      - wrong repository
+      - homework
+      - assignment
+      - general question
+      - how to
+      - how do i
+      - how can i
+      - how to build
+      - how do i build
+      - how to run
+      - how do i run
+      - run locally
+      - build locally
+      - clone
+      - cloning
+      - install instructions
+      - installation steps
+      - setup guide
+      - getting started
+      - build instructions

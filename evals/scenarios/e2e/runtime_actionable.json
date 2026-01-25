@@ -1,0 +1,27 @@
+{
+  "name": "runtime_actionable",
+  "eventName": "issues",
+  "issue": {
+    "number": 34,
+    "title": "Runtime exception when syncing",
+    "body": "## Operating System\nWindows 11\n\n## Runtime Version\n.NET 8.0.1\n\n## Error Message\nUnhandled exception: System.InvalidOperationException: Sequence contains no elements\n\n## Stack Trace\nSystem.InvalidOperationException: Sequence contains no elements\n   at SupportConcierge.Sync.Worker.Run()\n\n## Steps to Reproduce\n1. Run `dotnet run`\n2. Open the dashboard\n3. Click Sync\n\n## Expected Behavior\nSync completes successfully\n\n## Actual Behavior\nApp crashes with an exception",
+    "user": { "login": "bob" },
+    "state": "open",
+    "labels": [],
+    "assignees": [],
+    "html_url": "https://github.com/octo-org/sample-repo/issues/34"
+  },
+  "repository": {
+    "name": "sample-repo",
+    "owner": { "login": "octo-org" },
+    "full_name": "octo-org/sample-repo",
+    "default_branch": "main"
+  },
+  "comments": [],
+  "specPackPath": "evals/specpack.json",
+  "expectations": {
+    "expectedDecision": "finalize",
+    "expectedCategory": "runtime",
+    "minCompleteness": 75
+  }
+}

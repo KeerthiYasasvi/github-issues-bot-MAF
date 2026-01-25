@@ -1,0 +1,29 @@
+junk_patterns:
+  - '^(n/?a|na|none|unknown|tbd|todo|nil|n\\a)$'
+  - '^\?+$'
+  - '^-$'
+  - '^none provided$'
+
+format_validators:
+  version: '(?i).*\d+.*'
+  runtime_version: '(?i).*\d+.*'
+  build_tool_version: '(?i).*\d+.*'
+  operating_system: '(?i)(windows|mac|linux|ubuntu|debian|alpine|centos|rhel|fedora|darwin)'
+
+secret_patterns:
+  - '(?i)gh[pousr]_[A-Za-z0-9]{20,}'
+  - '(?i)sk-[A-Za-z0-9]{20,}'
+  - '(?i)xox[baprs]-[A-Za-z0-9-]{10,}'
+  - '(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*\S+'
+
+contradiction_rules:
+  - name: runtime_vs_app_version
+    description: Runtime version far from app version
+    field1: runtime_version
+    field2: version
+    condition: version_mismatch
+  - name: windows_bash
+    description: Bash command on Windows without WSL
+    field1: operating_system
+    field2: build_command
+    condition: windows_with_bash_native

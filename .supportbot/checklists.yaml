@@ -1,0 +1,142 @@
+checklists:
+  - category: setup
+    completeness_threshold: 70
+    required_fields:
+      - name: operating_system
+        description: OS and version where setup runs
+        weight: 15
+        aliases: [os, platform]
+      - name: version
+        description: App or package version
+        weight: 15
+        aliases: [app_version, package_version]
+      - name: installation_method
+        description: How the install was performed
+        weight: 20
+        aliases: [install_method, install_steps]
+      - name: error_message
+        description: Exact error message from setup
+        weight: 25
+        aliases: [error, failure]
+      - name: steps_to_reproduce
+        description: Steps to reproduce the setup failure
+        weight: 25
+        aliases: [repro_steps, reproduction_steps]
+
+  - category: build
+    completeness_threshold: 70
+    required_fields:
+      - name: operating_system
+        description: OS and version where build runs
+        weight: 10
+        aliases: [os, platform]
+      - name: build_command
+        description: Command used to build
+        weight: 20
+        aliases: [compile_command, build_step]
+      - name: build_log
+        description: Build output or log snippet
+        weight: 20
+        optional: true
+        aliases: [build_output, build_errors]
+      - name: error_message
+        description: Exact compiler or build error
+        weight: 20
+        aliases: [error, failure]
+      - name: version
+        description: App or package version
+        weight: 15
+        optional: true
+        aliases: [app_version, package_version]
+      - name: build_tool_version
+        description: Toolchain version (node, dotnet, etc.)
+        weight: 15
+        optional: true
+        aliases: [toolchain_version, compiler_version]
+
+  - category: runtime
+    completeness_threshold: 75
+    required_fields:
+      - name: operating_system
+        description: OS and version where runtime error occurs
+        weight: 10
+        aliases: [os, platform]
+      - name: runtime_version
+        description: Runtime version (node, python, dotnet, etc.)
+        weight: 15
+        aliases: [framework_version, sdk_version]
+      - name: error_message
+        description: Exact runtime error message
+        weight: 20
+        aliases: [error, exception]
+      - name: stack_trace
+        description: Stack trace or crash log
+        weight: 20
+        aliases: [trace, backtrace]
+      - name: steps_to_reproduce
+        description: Steps to reproduce the runtime issue
+        weight: 15
+        aliases: [repro_steps, reproduction_steps]
+      - name: expected_behavior
+        description: What should happen instead
+        weight: 10
+        aliases: [expected, expected_result]
+      - name: actual_behavior
+        description: What actually happens
+        weight: 10
+        aliases: [actual, actual_result]
+
+  - category: bug
+    completeness_threshold: 70
+    required_fields:
+      - name: steps_to_reproduce
+        description: Minimal repro steps
+        weight: 25
+        aliases: [repro_steps, reproduction_steps]
+      - name: expected_behavior
+        description: Expected outcome
+        weight: 20
+        aliases: [expected, expected_result]
+      - name: actual_behavior
+        description: Actual outcome
+        weight: 20
+        aliases: [actual, actual_result]
+      - name: version
+        description: App or package version
+        weight: 15
+        aliases: [app_version, package_version]
+      - name: operating_system
+        description: OS and version
+        weight: 10
+        aliases: [os, platform]
+      - name: screenshots
+        description: UI or output screenshots (optional)
+        weight: 10
+        optional: true
+        aliases: [screen, screenshot]
+
+  - category: docs
+    completeness_threshold: 60
+    required_fields:
+      - name: doc_location
+        description: Location of the documentation issue
+        weight: 30
+        aliases: [doc_page, page, url]
+      - name: issue_description
+        description: Description of the docs problem
+        weight: 30
+        aliases: [doc_issue, problem]
+      - name: version
+        description: Doc version or product version
+        weight: 20
+        optional: true
+        aliases: [app_version, package_version]
+      - name: screenshots
+        description: Screenshot of the docs issue
+        weight: 20
+        optional: true
+        aliases: [screen, screenshot]
+
+  - category: off_topic
+    completeness_threshold: 0
+    required_fields: []
