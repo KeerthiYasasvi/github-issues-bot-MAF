@@ -19,9 +19,8 @@ inputs:
     required: false
     default: 'gpt-4o-mini'
   github-token:
-    description: 'GitHub token for API access (defaults to ${{ github.token }})'
-    required: false
-    default: ${{ github.token }}
+    description: 'GitHub token for API access'
+    required: true
   dry-run:
     description: 'If true, bot processes but does not post comments'
     required: false

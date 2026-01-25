@@ -1,0 +1,20 @@
+{
+  "action": "opened",
+  "issue": {
+    "number": 1,
+    "title": "Test: App crashes on startup",
+    "body": "When I try to launch the app, it immediately crashes. Using Windows 11. I've tried reinstalling but the problem persists.",
+    "state": "open",
+    "html_url": "https://github.com/KeerthiYasasvi/yt-music-ELT-pipeline/issues/1",
+    "user": {
+      "login": "testuser"
+    }
+  },
+  "repository": {
+    "name": "yt-music-ELT-pipeline",
+    "owner": {
+      "login": "KeerthiYasasvi"
+    },
+    "full_name": "KeerthiYasasvi/yt-music-ELT-pipeline"
+  }
+}
