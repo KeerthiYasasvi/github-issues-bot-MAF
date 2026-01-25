@@ -1,0 +1,64 @@
+name: 'GitHub Issues Support Bot (MAF)'
+description: 'Automated triage and response bot using Microsoft Agent Framework'
+author: 'KeerthiYasasvi'
+
+branding:
+  icon: 'message-circle'
+  color: 'blue'
+
+inputs:
+  openai-api-key:
+    description: 'OpenAI API key for LLM access'
+    required: true
+  openai-model:
+    description: 'Primary OpenAI model (e.g., gpt-4o)'
+    required: false
+    default: 'gpt-4o'
+  openai-critique-model:
+    description: 'Critique model for cost optimization (e.g., gpt-4o-mini)'
+    required: false
+    default: 'gpt-4o-mini'
+  github-token:
+    description: 'GitHub token for API access (defaults to ${{ github.token }})'
+    required: false
+    default: ${{ github.token }}
+  dry-run:
+    description: 'If true, bot processes but does not post comments'
+    required: false
+    default: 'false'
+  write-mode:
+    description: 'If true, bot can post comments (requires dry-run=false)'
+    required: false
+    default: 'false'
+  spec-dir:
+    description: 'Path to spec pack directory (categories, playbooks, validators)'
+    required: false
+    default: '.supportbot'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      shell: pwsh
+      run: |
+        cd "${{ github.action_path }}/Github-issues-bot-with-MAF"
+        dotnet restore
+    
+    - name: Run Support Bot
+      shell: pwsh
+      run: |
+        cd "${{ github.action_path }}/Github-issues-bot-with-MAF"
+        dotnet run --project src/SupportConcierge.Cli -- --event-file $env:GITHUB_EVENT_PATH
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        OPENAI_MODEL: ${{ inputs.openai-model }}
+        OPENAI_CRITIQUE_MODEL: ${{ inputs.openai-critique-model }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        SUPPORTBOT_DRY_RUN: ${{ inputs.dry-run }}
+        SUPPORTBOT_WRITE_MODE: ${{ inputs.write-mode }}
+        SUPPORTBOT_SPEC_DIR: ${{ inputs.spec-dir }}
