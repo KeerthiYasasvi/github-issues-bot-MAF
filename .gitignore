@@ -29,6 +29,9 @@ artifacts/evals/
 # Local state snapshots
 state.json
 
+# Local test fixtures
+test-event.json
+
 # Documentation
 docs/
 *.md
