@@ -1,0 +1,44 @@
+name: Support Concierge Bot
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  supportbot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: KeerthiYasasvi/ghithub-issues-bot-MAF
+          path: bot
+          ref: main
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run Support Concierge
+        run: dotnet run --project bot/src/SupportConcierge.Cli -- --event-file "$GITHUB_EVENT_PATH"
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.API_KEY }}
+          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL }}
+          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL }}
+          SUPPORTBOT_DRY_RUN: ${{ vars.SUPPORTBOT_DRY_RUN || 'true' }}
+          SUPPORTBOT_WRITE_MODE: ${{ vars.SUPPORTBOT_WRITE_MODE || 'false' }}
+          SUPPORTBOT_SPEC_DIR: ${{ vars.SUPPORTBOT_SPEC_DIR || '.supportbot' }}
+          SUPPORTBOT_METRICS_DIR: artifacts/metrics
+
+      - name: Upload metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supportbot-metrics
+          path: artifacts/metrics

@@ -1,0 +1,16 @@
+{
+  "name": "build_brief_partial_info",
+  "category": "build",
+  "issueBody": "Build failing on Ubuntu 22.04. Error: CS1002: ; expected",
+  "extractedFields": {
+    "operating_system": "Ubuntu 22.04",
+    "error_message": "error CS1002: ; expected"
+  },
+  "playbook": "Capture build command, toolchain version, and error output. Suggest clean restore if appropriate.",
+  "repoDocs": "README: Build with dotnet build and ensure .NET 8 SDK is installed.",
+  "expectedBriefPattern": {
+    "should_ask_for": ["build command", "dotnet version"],
+    "should_contain": ["understand the issue", "need to know"],
+    "should_not_provide_solution_yet": true
+  }
+}

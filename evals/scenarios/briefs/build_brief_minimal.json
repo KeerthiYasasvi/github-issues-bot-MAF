@@ -1,0 +1,13 @@
+{
+  "name": "build_brief_minimal_info",
+  "category": "build",
+  "issueBody": "Build failing on my machine",
+  "extractedFields": {},
+  "playbook": "Capture build command, toolchain version, and error output. Suggest clean restore if appropriate.",
+  "repoDocs": "README: Build with dotnet build and ensure .NET 8 SDK is installed.",
+  "expectedBriefPattern": {
+    "should_ask_for": ["OS", "dotnet version", "exact error message"],
+    "should_contain": ["gather info", "need more details"],
+    "should_not_suggest_steps": true
+  }
+}
