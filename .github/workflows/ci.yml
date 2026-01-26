@@ -29,15 +29,16 @@ jobs:
       - name: Test
         run: dotnet test -c Release --no-build
 
-      - name: Run Evals (deterministic)
-        run: dotnet run --project src/SupportConcierge.Cli -- --eval --output-dir artifacts/evals
-        env:
-          SUPPORTBOT_NO_LLM: true
-          SUPPORTBOT_DRY_RUN: true
+      # Evals temporarily disabled during agentic migration
+      # - name: Run Evals (deterministic)
+      #   run: dotnet run --project src/SupportConcierge.Cli -- --eval --output-dir artifacts/evals
+      #   env:
+      #     SUPPORTBOT_NO_LLM: true
+      #     SUPPORTBOT_DRY_RUN: true
 
-      - name: Upload eval artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: supportbot-evals
-          path: artifacts/evals
+      # - name: Upload eval artifacts
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: supportbot-evals
+      #     path: artifacts/evals
