@@ -45,13 +45,13 @@ runs:
     - name: Restore dependencies
       shell: pwsh
       run: |
-        cd "${{ github.action_path }}/Github-issues-bot-with-MAF"
+        cd "${{ github.action_path }}"
         dotnet restore
     
     - name: Run Support Bot
       shell: pwsh
       run: |
-        cd "${{ github.action_path }}/Github-issues-bot-with-MAF"
+        cd "${{ github.action_path }}"
         dotnet run --project src/SupportConcierge.Cli -- --event-file $env:GITHUB_EVENT_PATH
       env:
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
