@@ -7,15 +7,23 @@ namespace SupportConcierge.Core.Workflows.Executors;
 
 /// <summary>
 /// MAF Executor: Post a response or follow-up comment to GitHub.
+/// 
+/// Responsibilities:
+/// 1. Compose well-formatted comments
+/// 2. Embed bot state in hidden HTML comment for persistence
+/// 3. Include clear instructions for user interaction
+/// 4. Track loop count for escalation decisions
 /// </summary>
 public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
 {
     private readonly IGitHubTool _gitHub;
+    private readonly StateStoreTool _stateTool;
 
     public PostCommentExecutor(IGitHubTool gitHub)
         : base("post_comment", ExecutorDefaults.Options, false)
     {
         _gitHub = gitHub;
+        _stateTool = new StateStoreTool();
     }
 
     public override async ValueTask<RunContext> HandleAsync(RunContext input, IWorkflowContext context, CancellationToken ct = default)
@@ -37,6 +45,13 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             return input;
         }
 
+        // Embed state in hidden HTML comment for persistence across invocations
+        if (input.State != null)
+        {
+            body = _stateTool.EmbedState(body, input.State);
+            Console.WriteLine($"[MAF] PostComment: Embedded state (Loop={input.State.LoopCount}, Category={input.State.Category})");
+        }
+
         var comment = await _gitHub.PostCommentAsync(owner, repo, issueNumber, body, ct);
         if (comment == null)
         {
@@ -54,14 +69,27 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
     {
         var sb = new StringBuilder();
         var author = input.Issue?.User?.Login;
+        
+        // Mention author
         if (!string.IsNullOrWhiteSpace(author))
         {
             sb.AppendLine($"@{author}");
             sb.AppendLine();
         }
 
+        if (input.ShouldStop && !string.IsNullOrWhiteSpace(input.StopReason))
+        {
+            // Handle /stop command
+            sb.AppendLine($"You've opted out with `/stop`. I won't ask further questions on this issue.");
+            sb.AppendLine();
+            sb.AppendLine("If you need to restart, comment with `/diagnose`.");
+            return sb.ToString().Trim();
+        }
+
         if (input.ShouldAskFollowUps)
         {
+            // Follow-up questions (formatted like previous project)
+            var loopCount = input.State?.LoopCount ?? 0;
             sb.AppendLine("I need a bit more information to help move this forward:");
             sb.AppendLine();
 
@@ -86,15 +114,41 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
                 sb.AppendLine($"{i + 1}. {questions[i]}");
             }
 
+            // Add helpful instructions
+            sb.AppendLine();
+            sb.AppendLine("---");
+            sb.AppendLine();
+            sb.AppendLine("**How to interact with me:**");
+            sb.AppendLine("- Reply directly to this comment with your answers");
+            sb.AppendLine("- If you need to restart analysis, comment with `/diagnose`");
+            sb.AppendLine("- If you want me to stop, comment with `/stop`");
+            sb.AppendLine();
+            sb.AppendLine($"_Loop {loopCount} of 3. I'll escalate to maintainer after 3 attempts if issue remains unclear._");
+
             return sb.ToString().Trim();
         }
 
         if (input.ShouldEscalate)
         {
-            sb.AppendLine("Escalating for human review. The automated checks reached the loop limit.");
+            // Escalation message
+            sb.AppendLine("I've attempted to gather information through multiple iterations, but the issue details remain unclear for automated processing.");
             sb.AppendLine();
+            sb.AppendLine("**Escalating to maintainer review** for human assessment.");
+            sb.AppendLine();
+            sb.AppendLine("---");
+            sb.AppendLine();
+            sb.AppendLine("What happened:");
+            sb.AppendLine("- ❌ I asked clarifying questions");
+            sb.AppendLine("- ❌ I analyzed the provided information");
+            sb.AppendLine("- ⚠️ I still need more context to proceed");
+            sb.AppendLine();
+            sb.AppendLine("**You can still help by:**");
+            sb.AppendLine("- Adding more details in a follow-up comment");
+            sb.AppendLine("- Commenting with `/diagnose` to restart fresh analysis");
+            return sb.ToString().Trim();
         }
 
+        // Brief/solution format (when issue is actionable)
         var brief = input.Brief;
         if (brief != null)
         {
@@ -113,12 +167,17 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
 
             if (brief.NextSteps.Count > 0)
             {
-                sb.AppendLine("**Next steps:**");
+                sb.AppendLine("**Recommended next steps:**");
                 foreach (var step in brief.NextSteps)
                 {
                     sb.AppendLine($"- {step}");
                 }
+                sb.AppendLine();
             }
+
+            sb.AppendLine("---");
+            sb.AppendLine();
+            sb.AppendLine("This issue has been analyzed and categorized. Please let me know if this assessment is correct or if you'd like me to reconsider.");
 
             return sb.ToString().Trim();
         }

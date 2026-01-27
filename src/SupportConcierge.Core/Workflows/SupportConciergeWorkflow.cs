@@ -8,7 +8,23 @@ namespace SupportConcierge.Core.Workflows;
 
 /// <summary>
 /// MAF Workflow for GitHub issue support bot
-/// DAG: ParseEvent → Guardrails → [Decision] → TriageExecutor → ResearchExecutor → ResponseExecutor → OrchestratorEvaluate → [Decision] → PersistState
+/// 
+/// DAG Flow:
+/// ParseEvent → LoadState → Guardrails → [Decision: /stop or finalized?]
+///   ↓ No → Triage → Research → Response → OrchestratorEvaluate 
+///   ↓ [Decision: ask questions/finalize/escalate?]
+///   ├→ AskFollowUps → PostComment → PersistState → Exit
+///   ├→ Finalize → PostComment → PersistState → Exit
+///   ├→ Escalate → PostComment → PersistState → Exit
+///   ├→ Continue Loop → Triage (max 3 iterations)
+///   ↓ Yes → PostComment → PersistState → Exit
+/// 
+/// Key Improvements:
+/// - State loading from previous comments for persistence
+/// - Author gating (only issue author can interact)
+/// - Loop limit enforcement (max 3 iterations)
+/// - Proper command parsing (/stop, /diagnose)
+/// - State embedding in comments
 /// </summary>
 public static class SupportConciergeWorkflow
 {
@@ -26,6 +42,7 @@ public static class SupportConciergeWorkflow
     {
         // Create executors
         var parseEvent = new ParseEventExecutor();
+        var loadState = new LoadStateExecutor(gitHubTool);
         var guardrails = new GuardrailsExecutor();
         var triage = new TriageExecutor(triageAgent, criticAgent);
         var research = new ResearchExecutor(researchAgent, criticAgent, toolRegistry);
@@ -36,6 +53,7 @@ public static class SupportConciergeWorkflow
 
         // Build workflow DAG
         var builder = new WorkflowBuilder(parseEvent)
+            .BindExecutor(loadState)
             .BindExecutor(guardrails)
             .BindExecutor(triage)
             .BindExecutor(research)
@@ -44,31 +62,40 @@ public static class SupportConciergeWorkflow
             .BindExecutor(postComment)
             .BindExecutor(persistState);
 
-        // Linear edges: parseEvent → guardrails → triage → research → response → orchestratorEvaluate → persistState
-        builder.AddEdge(parseEvent, guardrails);
+        // Main flow: ParseEvent → LoadState → Guardrails
+        builder.AddEdge(parseEvent, loadState);
+        builder.AddEdge(loadState, guardrails);
 
-        // After guardrails, check for /stop
-        builder.AddEdge<RunContext>(guardrails, persistState, ctx => ctx?.ShouldStop ?? false);
-        builder.AddEdge<RunContext>(guardrails, triage, ctx => !(ctx?.ShouldStop ?? false));
-
-        // After triage, continue to research
-        builder.AddEdge(triage, research);
-
-        // After research, continue to response
-        builder.AddEdge(research, response);
-
-        // After response, evaluate with orchestrator
-        builder.AddEdge(response, orchestratorEvaluate);
-
-        // After orchestrator evaluates, decide next action
-        // If finalize or escalate or follow_up, post comment then persist and exit
-        builder.AddEdge<RunContext>(orchestratorEvaluate, postComment, ctx =>
-            (ctx?.ShouldFinalize ?? false) || (ctx?.ShouldEscalate ?? false) || (ctx?.ShouldAskFollowUps ?? false) || ((ctx?.CurrentLoopCount ?? 0) >= 3));
+        // After guardrails: check for /stop or finalized
+        builder.AddEdge<RunContext>(guardrails, postComment, ctx => ctx?.ShouldStop ?? false);
         builder.AddEdge(postComment, persistState);
 
-        // If loop < 3 and no terminal decision, loop back to triage
-        builder.AddEdge<RunContext>(orchestratorEvaluate, triage, ctx => 
-            !((ctx?.ShouldFinalize ?? false) || (ctx?.ShouldEscalate ?? false) || (ctx?.ShouldAskFollowUps ?? false)) && ((ctx?.CurrentLoopCount ?? 0) < 3));
+        // Normal flow: Guardrails → Triage → Research → Response → Evaluate
+        builder.AddEdge<RunContext>(guardrails, triage, ctx => !(ctx?.ShouldStop ?? false));
+        builder.AddEdge(triage, research);
+        builder.AddEdge(research, response);
+        builder.AddEdge(response, orchestratorEvaluate);
+
+        // After orchestrator evaluation: decide next action
+        // Decision 1: Ask follow-up questions
+        builder.AddEdge<RunContext>(orchestratorEvaluate, postComment, ctx =>
+            (ctx?.ShouldAskFollowUps ?? false) && ((ctx?.CurrentLoopCount ?? 0) < 3));
+
+        // Decision 2: Finalize (actionable)
+        builder.AddEdge<RunContext>(orchestratorEvaluate, postComment, ctx =>
+            (ctx?.ShouldFinalize ?? false));
+
+        // Decision 3: Escalate
+        builder.AddEdge<RunContext>(orchestratorEvaluate, postComment, ctx =>
+            (ctx?.ShouldEscalate ?? false) || ((ctx?.CurrentLoopCount ?? 0) >= 3));
+
+        // After posting, persist state
+        builder.AddEdge(postComment, persistState);
+
+        // Decision 4: Loop back for another iteration (if we haven't hit the limit)
+        builder.AddEdge<RunContext>(orchestratorEvaluate, triage, ctx =>
+            !((ctx?.ShouldFinalize ?? false) || (ctx?.ShouldEscalate ?? false) || (ctx?.ShouldAskFollowUps ?? false)) && 
+            ((ctx?.CurrentLoopCount ?? 0) < 3));
 
         return builder.Build();
     }

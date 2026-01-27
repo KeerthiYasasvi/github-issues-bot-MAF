@@ -36,3 +36,11 @@ test-event.json
 docs/
 *.md
 !README.md
+# Allow prompt templates
+!prompts/
+
+# Developer reference documentation (personal use only)
+IMPLEMENTATION_SUMMARY.md
+BOT_ACCOUNT_CONFIGURATION.md
+QUICK_REFERENCE.md
+PREVIOUS_PROJECT_ANALYSIS.md

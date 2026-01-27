@@ -27,14 +27,18 @@ jobs:
       - name: Run Support Concierge
         run: dotnet run --project bot/src/SupportConcierge.Cli -- --event-file "$GITHUB_EVENT_PATH"
         env:
-          GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.API_KEY }}
-          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL }}
-          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || secrets.API_KEY }}
+          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL || 'gpt-4o' }}
+          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL || 'gpt-4o-mini' }}
           SUPPORTBOT_DRY_RUN: ${{ vars.SUPPORTBOT_DRY_RUN || 'false' }}
           SUPPORTBOT_WRITE_MODE: ${{ vars.SUPPORTBOT_WRITE_MODE || 'true' }}
           SUPPORTBOT_SPEC_DIR: ${{ vars.SUPPORTBOT_SPEC_DIR || '.supportbot' }}
           SUPPORTBOT_METRICS_DIR: artifacts/metrics
+          SUPPORTBOT_USERNAME: github-actions[bot]
 
       - name: Upload metrics
         if: always()
