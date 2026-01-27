@@ -208,10 +208,66 @@ public static class Program
             return null;
         }
 
-        var type = workflowRun.GetType();
-        var outputProperty = type.GetProperty("Output") ?? type.GetProperty("Result") ?? type.GetProperty("OutputValue");
-        var output = outputProperty?.GetValue(workflowRun);
-        return output as RunContext;
+        return ExtractRunContext(workflowRun, maxDepth: 2);
+    }
+
+    private static RunContext? ExtractRunContext(object? value, int maxDepth)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        if (value is RunContext runContext)
+        {
+            return runContext;
+        }
+
+        if (maxDepth <= 0)
+        {
+            return null;
+        }
+
+        var type = value.GetType();
+        var outputProperty = type.GetProperty("Output") ?? type.GetProperty("Result") ?? type.GetProperty("OutputValue") ?? type.GetProperty("Outputs");
+        if (outputProperty != null)
+        {
+            var output = outputProperty.GetValue(value);
+            var fromOutput = ExtractRunContext(output, maxDepth - 1);
+            if (fromOutput != null)
+            {
+                return fromOutput;
+            }
+        }
+
+        if (value is System.Collections.IEnumerable enumerable && value is not string)
+        {
+            foreach (var item in enumerable)
+            {
+                var fromItem = ExtractRunContext(item, maxDepth - 1);
+                if (fromItem != null)
+                {
+                    return fromItem;
+                }
+            }
+        }
+
+        foreach (var property in type.GetProperties())
+        {
+            if (property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            var propertyValue = property.GetValue(value);
+            var fromProperty = ExtractRunContext(propertyValue, maxDepth - 1);
+            if (fromProperty != null)
+            {
+                return fromProperty;
+            }
+        }
+
+        return null;
     }
 
     private static async Task WriteMetricsAsync(MetricsTool metrics)
