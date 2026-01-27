@@ -80,6 +80,23 @@ public static class MafPromptTemplates
             return botPromptsDir;
         }
 
+        // Try parent directories (in case we're in a bin subdirectory)
+        var current = workspaceRoot;
+        for (int i = 0; i < 6; i++)
+        {
+            var parentPromptsDir = Path.Combine(current, "prompts");
+            if (Directory.Exists(parentPromptsDir))
+            {
+                Console.WriteLine($"[Prompts] Found parent prompts directory: {parentPromptsDir}");
+                return parentPromptsDir;
+            }
+
+            var parent = Directory.GetParent(current)?.FullName;
+            if (parent == null || parent == current)
+                break;
+            current = parent;
+        }
+
         var assemblyDir = Path.GetDirectoryName(typeof(MafPromptTemplates).Assembly.Location) ?? ".";
         var fallbackDir = Path.Combine(assemblyDir, "..", "..", "..", "..", "..", "..", "prompts");
         Console.WriteLine($"[Prompts] Using fallback directory: {fallbackDir}");
