@@ -66,34 +66,43 @@ public static class MafPromptTemplates
     {
         var workspaceRoot = FindWorkspaceRoot();
         var promptsDir = Path.Combine(workspaceRoot, "prompts");
+        Console.WriteLine($"[Prompts] Checking workspace root prompts: {promptsDir}");
         if (Directory.Exists(promptsDir))
         {
-            Console.WriteLine($"[Prompts] Found prompts directory: {promptsDir}");
+            Console.WriteLine($"[Prompts] ✓ Found prompts directory: {promptsDir}");
             return promptsDir;
         }
+        Console.WriteLine($"[Prompts] ✗ workspace root prompts not found");
 
         // Try relative to bot subdirectory (used in test repos)
         var botPromptsDir = Path.Combine(workspaceRoot, "bot", "prompts");
+        Console.WriteLine($"[Prompts] Checking bot/prompts: {botPromptsDir}");
         if (Directory.Exists(botPromptsDir))
         {
-            Console.WriteLine($"[Prompts] Found bot/prompts directory: {botPromptsDir}");
+            Console.WriteLine($"[Prompts] ✓ Found bot/prompts directory: {botPromptsDir}");
             return botPromptsDir;
         }
+        Console.WriteLine($"[Prompts] ✗ bot/prompts not found (exists bot dir? {Directory.Exists(Path.Combine(workspaceRoot, "bot"))})");
 
         // Try parent directories (in case we're in a bin subdirectory)
+        Console.WriteLine($"[Prompts] Searching parent directories from: {workspaceRoot}");
         var current = workspaceRoot;
         for (int i = 0; i < 6; i++)
         {
             var parentPromptsDir = Path.Combine(current, "prompts");
+            Console.WriteLine($"[Prompts] Parent search level {i}: checking {parentPromptsDir}");
             if (Directory.Exists(parentPromptsDir))
             {
-                Console.WriteLine($"[Prompts] Found parent prompts directory: {parentPromptsDir}");
+                Console.WriteLine($"[Prompts] ✓ Found parent prompts directory: {parentPromptsDir}");
                 return parentPromptsDir;
             }
 
             var parent = Directory.GetParent(current)?.FullName;
             if (parent == null || parent == current)
+            {
+                Console.WriteLine($"[Prompts] Reached filesystem root");
                 break;
+            }
             current = parent;
         }
 
