@@ -1,7 +1,23 @@
 namespace SupportConcierge.Core.Guardrails;
 
+using SupportConcierge.Core.Models;
+
 public static class CommandParser
 {
+    /// <summary>
+    /// Parses text for special bot commands (/stop, /diagnose) and returns a CommandInfo object.
+    /// </summary>
+    /// <param name="text">The text to parse for commands</param>
+    /// <returns>A CommandInfo object with detected command flags</returns>
+    public static CommandInfo Parse(string? text)
+    {
+        return new CommandInfo
+        {
+            HasStopCommand = HasStopCommand(text),
+            HasDiagnoseCommand = HasDiagnoseCommand(text)
+        };
+    }
+
     public static bool HasStopCommand(string? text)
     {
         return ContainsCommand(text, "/stop");
@@ -22,3 +38,4 @@ public static class CommandParser
         return text.IndexOf(command, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
+
