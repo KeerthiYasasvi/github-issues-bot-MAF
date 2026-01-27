@@ -92,11 +92,23 @@ public static class Program
             Repository = input.Repository
         };
 
+        var decision = ResolveDecision(resultContext);
+        if (decision == "unknown")
+        {
+            Console.WriteLine("[MAF] Final decision unknown; applying fallback follow-up response.");
+            ApplyFallbackFollowUp(resultContext);
+            decision = ResolveDecision(resultContext);
+        }
+
         // Extract result from workflow execution - the Run object contains execution history
-        // For now, create a result context with the execution summary
-        Console.WriteLine($"\n[MAF Final Decision] {ResolveDecision(resultContext)}");
+        Console.WriteLine($"\n[MAF Final Decision] {decision}");
         Console.WriteLine($"[Metrics] Tokens used: {metricsRecord.TokenUsage.TotalTokens}");
         Console.WriteLine("[MAF] Workflow completed successfully");
+
+        if (decision == "follow_up")
+        {
+            await TryPostFallbackCommentAsync(resultContext, gitHubTool);
+        }
 
         await WriteMetricsAsync(metrics);
 
@@ -205,6 +217,84 @@ public static class Program
         }
 
         return "unknown";
+    }
+
+    private static void ApplyFallbackFollowUp(RunContext context)
+    {
+        context.ShouldAskFollowUps = true;
+
+        if (context.FollowUpQuestions.Count == 0)
+        {
+            context.FollowUpQuestions.Add(new FollowUpQuestion
+            {
+                Question = "Please share the exact error message and any relevant logs or stack traces."
+            });
+            context.FollowUpQuestions.Add(new FollowUpQuestion
+            {
+                Question = "What OS and runtime/build tool versions are you using?"
+            });
+            context.FollowUpQuestions.Add(new FollowUpQuestion
+            {
+                Question = "What steps lead to the failure?"
+            });
+        }
+    }
+
+    private static async Task TryPostFallbackCommentAsync(RunContext context, IGitHubTool gitHubTool)
+    {
+        var owner = context.Repository?.Owner?.Login ?? string.Empty;
+        var repo = context.Repository?.Name ?? string.Empty;
+        var issueNumber = context.Issue?.Number ?? 0;
+
+        if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repo) || issueNumber <= 0)
+        {
+            Console.WriteLine("[MAF] PostComment: Missing repository or issue information.");
+            return;
+        }
+
+        var body = ComposeFallbackFollowUp(context);
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            Console.WriteLine("[MAF] PostComment: No content generated; skipping.");
+            return;
+        }
+
+        var comment = await gitHubTool.PostCommentAsync(owner, repo, issueNumber, body, CancellationToken.None);
+        if (comment == null)
+        {
+            Console.WriteLine("[MAF] PostComment: Skipped (dry-run or write-mode disabled).");
+        }
+        else
+        {
+            Console.WriteLine($"[MAF] PostComment: Posted comment id {comment.Id}.");
+        }
+    }
+
+    private static string ComposeFallbackFollowUp(RunContext context)
+    {
+        var sb = new System.Text.StringBuilder();
+        var author = context.Issue?.User?.Login;
+        if (!string.IsNullOrWhiteSpace(author))
+        {
+            sb.AppendLine($"@{author}");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("I need a bit more information to help move this forward:");
+        sb.AppendLine();
+
+        var questions = context.FollowUpQuestions
+            .Select(q => q.Question)
+            .Where(q => !string.IsNullOrWhiteSpace(q))
+            .Take(3)
+            .ToList();
+
+        for (var i = 0; i < questions.Count; i++)
+        {
+            sb.AppendLine($"{i + 1}. {questions[i]}");
+        }
+
+        return sb.ToString().Trim();
     }
 
     private static RunContext? TryGetRunContext(object? workflowRun)
