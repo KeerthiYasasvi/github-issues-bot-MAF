@@ -225,15 +225,15 @@ public static class Program
 
         if (context.FollowUpQuestions.Count == 0)
         {
-            context.FollowUpQuestions.Add(new FollowUpQuestion
+            context.FollowUpQuestions.Add(new SupportConcierge.Core.Models.FollowUpQuestion
             {
                 Question = "Please share the exact error message and any relevant logs or stack traces."
             });
-            context.FollowUpQuestions.Add(new FollowUpQuestion
+            context.FollowUpQuestions.Add(new SupportConcierge.Core.Models.FollowUpQuestion
             {
                 Question = "What OS and runtime/build tool versions are you using?"
             });
-            context.FollowUpQuestions.Add(new FollowUpQuestion
+            context.FollowUpQuestions.Add(new SupportConcierge.Core.Models.FollowUpQuestion
             {
                 Question = "What steps lead to the failure?"
             });
