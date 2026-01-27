@@ -53,9 +53,12 @@ public static class MafPromptTemplates
         var path = Path.Combine(PromptsDirectory, "maf-templates", templateName);
         if (!File.Exists(path))
         {
-            throw new FileNotFoundException($"MAF prompt template not found: {templateName} (looked in {path})");
+            var error = $"MAF prompt template not found: {templateName} (looked in {path})";
+            Console.WriteLine($"[Prompts] ERROR: {error}");
+            throw new FileNotFoundException(error);
         }
 
+        Console.WriteLine($"[Prompts] Loading template: {templateName}");
         return await File.ReadAllTextAsync(path, cancellationToken);
     }
 
@@ -65,28 +68,60 @@ public static class MafPromptTemplates
         var promptsDir = Path.Combine(workspaceRoot, "prompts");
         if (Directory.Exists(promptsDir))
         {
+            Console.WriteLine($"[Prompts] Found prompts directory: {promptsDir}");
             return promptsDir;
+        }
+
+        // Try relative to bot subdirectory (used in test repos)
+        var botPromptsDir = Path.Combine(workspaceRoot, "bot", "prompts");
+        if (Directory.Exists(botPromptsDir))
+        {
+            Console.WriteLine($"[Prompts] Found bot/prompts directory: {botPromptsDir}");
+            return botPromptsDir;
         }
 
         var assemblyDir = Path.GetDirectoryName(typeof(MafPromptTemplates).Assembly.Location) ?? ".";
         var fallbackDir = Path.Combine(assemblyDir, "..", "..", "..", "..", "..", "..", "prompts");
+        Console.WriteLine($"[Prompts] Using fallback directory: {fallbackDir}");
         return fallbackDir;
     }
 
     private static string FindWorkspaceRoot()
     {
         var current = Directory.GetCurrentDirectory();
+        Console.WriteLine($"[Prompts] Starting workspace search from: {current}");
+        var searchedPaths = new List<string>();
+        
         while (current != null)
         {
-            if (File.Exists(Path.Combine(current, "SupportConcierge.slnx")) ||
-                Directory.Exists(Path.Combine(current, ".supportbot")))
+            searchedPaths.Add(current);
+            
+            // Check for solution file
+            if (File.Exists(Path.Combine(current, "SupportConcierge.slnx")))
             {
+                Console.WriteLine($"[Prompts] Found workspace root (slnx): {current}");
+                return current;
+            }
+            
+            // Check for .supportbot
+            if (Directory.Exists(Path.Combine(current, ".supportbot")))
+            {
+                Console.WriteLine($"[Prompts] Found workspace root (.supportbot): {current}");
+                return current;
+            }
+            
+            // Check for bot subdirectory (test repo setup)
+            if (Directory.Exists(Path.Combine(current, "bot")) &&
+                File.Exists(Path.Combine(current, "bot", "SupportConcierge.slnx")))
+            {
+                Console.WriteLine($"[Prompts] Found bot workspace root: {current}");
                 return current;
             }
 
             current = Directory.GetParent(current)?.FullName;
         }
 
+        Console.WriteLine($"[Prompts] No workspace root found, searched: {string.Join(", ", searchedPaths.Take(5))}...");
         return Directory.GetCurrentDirectory();
     }
 }

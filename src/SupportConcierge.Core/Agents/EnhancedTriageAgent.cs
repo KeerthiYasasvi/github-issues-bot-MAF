@@ -47,33 +47,48 @@ public class EnhancedTriageAgent
     /// </summary>
     public async Task<TriageResult> ClassifyAndExtractAsync(RunContext context, CancellationToken cancellationToken = default)
     {
-        var schema = OrchestrationSchemas.GetTriageRefinementSchema();
-        var categoriesJson = string.Join(", ", PredefinedCategories.Select(c => $"\"{c}\""));
-
-        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
-            "triage-classify.md",
-            new Dictionary<string, string>
-            {
-                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
-                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
-                ["CATEGORIES_JSON"] = categoriesJson
-            },
-            cancellationToken);
-
-        var request = new LlmRequest
+        try
         {
-            Messages = new List<LlmMessage>
-            {
-                new() { Role = "system", Content = systemPrompt },
-                new() { Role = "user", Content = userPrompt }
-            },
-            JsonSchema = schema,
-            SchemaName = "TriageRefinement",
-            Temperature = 0.3
-        };
+            var schema = OrchestrationSchemas.GetTriageRefinementSchema();
+            var categoriesJson = string.Join(", ", PredefinedCategories.Select(c => $"\"{c}\""));
 
-        var response = await _llmClient.CompleteAsync(request, cancellationToken);
-        return ParseTriageResponse(response, context);
+            var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+                "triage-classify.md",
+                new Dictionary<string, string>
+                {
+                    ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                    ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
+                    ["CATEGORIES_JSON"] = categoriesJson
+                },
+                cancellationToken);
+
+            var request = new LlmRequest
+            {
+                Messages = new List<LlmMessage>
+                {
+                    new() { Role = "system", Content = systemPrompt },
+                    new() { Role = "user", Content = userPrompt }
+                },
+                JsonSchema = schema,
+                SchemaName = "TriageRefinement",
+                Temperature = 0.3
+            };
+
+            var response = await _llmClient.CompleteAsync(request, cancellationToken);
+            return ParseTriageResponse(response, context);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MAF] Triage: Error during classification: {ex.GetType().Name}: {ex.Message}");
+            return new TriageResult
+            {
+                Categories = new List<string> { "unclassified" },
+                ExtractedDetails = new Dictionary<string, string> { { "title", context.Issue.Title } },
+                ConfidenceScore = 0.0m,
+                Reasoning = $"Triage failed: {ex.Message}",
+                CustomCategory = null
+            };
+        }
     }
 
     /// <summary>
