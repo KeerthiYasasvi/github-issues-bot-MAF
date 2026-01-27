@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SupportConcierge.Core.Models;
+using SupportConcierge.Core.Prompts;
 using SupportConcierge.Core.Schemas;
 using SupportConcierge.Core.Tools;
 
@@ -50,32 +51,23 @@ public class EnhancedResearchAgent
         var categoriesText = string.Join(", ", triageResult.Categories);
         var extractedText = string.Join("; ", triageResult.ExtractedDetails.Select(kv => $"{kv.Key}: {kv.Value}"));
 
-        var prompt = $@"You are selecting tools for GitHub issue investigation.
-
-Issue Title: {context.Issue.Title}
-Categories: {categoriesText}
-Extracted Details: {extractedText}
-
-Available Tools:
-{availableTools}
-
-Determine which tools would be most effective for investigating this issue:
-1. What is the core problem to investigate?
-2. Which tools would provide relevant findings?
-3. What query parameters should each tool use?
-4. What's the overall investigation strategy?
-
-Return JSON with:
-- selected_tools: Array of tools to use with reasoning and query parameters
-- investigation_strategy: Overall approach (e.g., 'analyze error patterns', 'search similar issues')
-- expected_findings: What we hope to learn from this investigation";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "research-select-tools.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["CATEGORIES"] = categoriesText,
+                ["EXTRACTED_DETAILS"] = extractedText,
+                ["AVAILABLE_TOOLS"] = availableTools
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are an expert at selecting appropriate investigation tools based on issue characteristics." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "ToolSelection",
@@ -101,36 +93,24 @@ Return JSON with:
         var toolsUsedText = string.Join(", ", toolSelection.SelectedTools.Select(t => t.ToolName));
         var resultsText = string.Join("\n---\n", toolResults.Select(kv => $"[{kv.Key}]\n{kv.Value}"));
 
-        var prompt = $@"You are synthesizing investigation findings from multiple tools.
-
-Issue Title: {context.Issue.Title}
-Categories: {string.Join(", ", triageResult.Categories)}
-Investigation Strategy: {toolSelection.InvestigationStrategy}
-
-Tools Used: {toolsUsedText}
-
-Tool Results:
-{resultsText}
-
-Synthesize findings into structured results:
-1. What did each tool reveal?
-2. Are there patterns or connections between findings?
-3. How deep is our investigation? (shallow/medium/deep)
-4. What key insights did we gain?
-5. Do we need additional investigation?
-
-Return JSON with:
-- tools_used: List of tools that were used
-- findings: Array of structured findings with type, content, source, confidence
-- investigation_depth: Assessment of how thorough this is
-- next_steps_recommended: Additional steps if needed";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "research-investigate.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["CATEGORIES"] = string.Join(", ", triageResult.Categories),
+                ["INVESTIGATION_STRATEGY"] = toolSelection.InvestigationStrategy ?? string.Empty,
+                ["TOOLS_USED"] = toolsUsedText,
+                ["TOOL_RESULTS"] = resultsText
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are expert at synthesizing tool outputs into coherent findings." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "ResearchResult",
@@ -163,42 +143,26 @@ Return JSON with:
         var additionalText = string.Join("\n---\n", additionalToolResults
             .Select(kv => $"[{kv.Key}]\n{kv.Value}"));
 
-        var prompt = $@"You are deepening GitHub issue investigation based on quality feedback.
-
-Issue Title: {context.Issue.Title}
-Categories: {string.Join(", ", triageResult.Categories)}
-
-Previous Investigation Depth: {previousInvestigation.InvestigationDepth}
-
-Previous Findings:
-{previousFindingsText}
-
-Quality Feedback (Score: {critiqueFeedback.Score}/10):
-Issues Identified:
-{issuesText}
-
-Additional Tool Results:
-{additionalText}
-
-Conduct deeper investigation addressing the gaps:
-1. What information was missing?
-2. What do the additional results reveal?
-3. Fill gaps in the previous investigation
-4. Reassess investigation depth (now: {previousInvestigation.InvestigationDepth})
-5. Are we ready to respond or need more investigation?
-
-Return enhanced JSON with:
-- tools_used: All tools used across both investigations
-- findings: Complete set of findings including new ones
-- investigation_depth: Updated assessment (likely 'deep' now)
-- next_steps_recommended: Any remaining gaps";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "research-deep-dive.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["CATEGORIES"] = string.Join(", ", triageResult.Categories),
+                ["PREV_INVESTIGATION_DEPTH"] = previousInvestigation.InvestigationDepth ?? string.Empty,
+                ["PREV_FINDINGS"] = previousFindingsText,
+                ["CRITIQUE_SCORE"] = critiqueFeedback.Score.ToString("0.##"),
+                ["CRITIQUE_ISSUES"] = issuesText,
+                ["ADDITIONAL_TOOL_RESULTS"] = additionalText
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are expert at deepening investigations when initial findings were insufficient." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "ResearchResult",

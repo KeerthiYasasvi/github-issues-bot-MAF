@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SupportConcierge.Core.Models;
+using SupportConcierge.Core.Prompts;
 using SupportConcierge.Core.Schemas;
 using SupportConcierge.Core.Tools;
 
@@ -43,38 +44,24 @@ public class CriticAgent
         var categoryText = triageResult?.Category ?? "unknown";
         var extractedDetailsText = JsonSerializer.Serialize(context.CasePacket.Fields);
 
-        var prompt = $@"You are a quality evaluator for issue triage. Assess the classification and extraction of this GitHub issue.
-
-Issue Title: {context.Issue.Title}
-Issue Body: {context.Issue.Body}
-
-Triage Results:
-- Category: {categoryText}
-- Confidence: {triageResult?.Confidence:F2}
-- Extracted Details: {extractedDetailsText}
-
-Evaluate on these criteria:
-1. Accuracy: Is category correctly identified?
-2. Completeness: Did extraction capture key problem details?
-3. Confidence: How certain are you about these results?
-4. Hallucination Risk: Are there unsupported claims?
-
-Score from 1-10 (1=poor, 10=excellent).
-Fail if score < 6 (missing info, low confidence, or inaccuracies).
-
-Return JSON with:
-- score: 1-10
-- reasoning: Brief assessment
-- issues: Array of specific problems found
-- suggestions: How to improve the triage
-- is_passable: Boolean (true if score >= 6)";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "critic-triage.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
+                ["TRIAGE_CATEGORY"] = categoryText,
+                ["TRIAGE_CONFIDENCE"] = triageResult?.Confidence.ToString("0.00") ?? "0.00",
+                ["EXTRACTED_DETAILS_JSON"] = extractedDetailsText
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are a rigorous quality critic for GitHub issue triage. Identify problems early before downstream processing." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "CritiqueResult",
@@ -100,37 +87,22 @@ Return JSON with:
         var resultsText = string.Join("\n---\n", investigationResults);
         var categoriesText = context.CategoryDecision?.Category ?? "unknown";
 
-        var prompt = $@"You are a quality evaluator for issue investigation. Assess the depth and relevance of research findings.
-
-Issue Title: {context.Issue.Title}
-Issue Categories: {categoriesText}
-
-Investigation Results:
-{resultsText}
-
-Evaluate on these criteria:
-1. Relevance: Are results directly addressing the issue?
-2. Depth: Is investigation thorough enough to support a response?
-3. Accuracy: Are findings credible and evidence-based?
-4. Completeness: Are there obvious gaps in investigation?
-5. Actionability: Can we form a response from these findings?
-
-Score from 1-10 (1=insufficient, 10=excellent).
-Fail if score < 5 (missing critical information, speculation, or incomplete).
-
-Return JSON with:
-- score: 1-10
-- reasoning: Assessment summary
-- issues: Array of gaps or concerns
-- suggestions: What additional research is needed
-- is_passable: Boolean (true if score >= 5)";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "critic-research.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["CATEGORIES"] = categoriesText,
+                ["INVESTIGATION_RESULTS"] = resultsText
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are a rigorous quality critic for issue investigation. Ensure findings are thorough before response generation." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "CritiqueResult",
@@ -157,41 +129,23 @@ Return JSON with:
         var followUpText = followUp != null ? string.Join("\n", followUp.Questions.Select(q => q.Question).Take(3)) : "No follow-ups";
         var categoryText = context.CategoryDecision?.Category ?? "unknown";
 
-        var prompt = $@"You are a quality evaluator for support responses. Assess the generated response to a GitHub issue.
-
-Issue Title: {context.Issue.Title}
-Issue Category: {categoryText}
-
-Generated Response:
-{briefText}
-
-Follow-up Questions (if any):
-{followUpText}
-
-Evaluate on these criteria:
-1. Helpfulness: Does the response actually help resolve the issue?
-2. Clarity: Is the response clear and easy to understand?
-3. Accuracy: Is the information correct and well-founded?
-4. Completeness: Does it address the core problem comprehensively?
-5. Tone: Is the response professional and empathetic?
-6. Actionability: Can the user act on the response?
-
-Score from 1-10 (1=unhelpful, 10=excellent).
-Fail if score < 7 (unclear, inaccurate, incomplete, or tone issues).
-
-Return JSON with:
-- score: 1-10
-- reasoning: Assessment summary
-- issues: Array of specific problems with the response
-- suggestions: How to improve the response
-- is_passable: Boolean (true if score >= 7)";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "critic-response.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["CATEGORY"] = categoryText,
+                ["BRIEF_JSON"] = briefText,
+                ["FOLLOW_UPS"] = followUpText
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are a rigorous quality critic for support responses. Ensure responses are helpful, clear, and accurate before posting." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "CritiqueResult",
@@ -206,6 +160,7 @@ Return JSON with:
     {
         if (!response.IsSuccess)
         {
+            LogCritiqueFailure(stage, "LLM call failed", response, null);
             return new CritiqueResult
             {
                 Score = 3,
@@ -267,6 +222,7 @@ Return JSON with:
         }
         catch (Exception ex)
         {
+            LogCritiqueFailure(stage, "Failed to parse critique JSON", response, ex);
             return new CritiqueResult
             {
                 Score = 3,
@@ -285,6 +241,35 @@ Return JSON with:
                 IsPassable = false
             };
         }
+    }
+
+    private static void LogCritiqueFailure(string stage, string message, LlmResponse response, Exception? exception)
+    {
+        Console.WriteLine($"[MAF] Critic ({stage}): {message}.");
+        if (exception != null)
+        {
+            Console.WriteLine($"[MAF] Critic ({stage}): Exception: {exception.Message}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(response.Content))
+        {
+            Console.WriteLine($"[MAF] Critic ({stage}): Content: {Truncate(response.Content, 2000)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(response.RawResponse))
+        {
+            Console.WriteLine($"[MAF] Critic ({stage}): Raw response: {Truncate(response.RawResponse, 2000)}");
+        }
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value.Substring(0, maxLength) + "…";
     }
 }
 

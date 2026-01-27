@@ -54,6 +54,8 @@ public static class Program
         var metricsRecord = new MetricsRecord();
         var metrics = new MetricsTool(metricsRecord);
 
+        Console.WriteLine($"[MAF] Runtime config: dry-run={dryRun}, write-mode={writeMode}");
+
         // Create clients for dual-model setup (agents use gpt-4o, critics use gpt-4o-mini)
         ILlmClient agentLlmClient = CreateLlmClient(metrics, modelOverride: null);  // OPENAI_MODEL (primary)
         ILlmClient criticLlmClient = CreateLlmClient(metrics, modelOverride: Environment.GetEnvironmentVariable("OPENAI_CRITIQUE_MODEL"));  // OPENAI_CRITIQUE_MODEL (optional)
@@ -67,28 +69,30 @@ public static class Program
         var researchAgent = new EnhancedResearchAgent(agentLlmClient, schemaValidator);
         var responseAgent = new EnhancedResponseAgent(agentLlmClient, schemaValidator);
         var toolRegistry = new ToolRegistry();
+        var gitHubTool = new GitHubTool(token, dryRun, writeMode);
 
         Console.WriteLine($"[MAF] Building workflow for issue #{input.Issue.Number}: {input.Issue.Title}");
 
         // Build MAF workflow
-        var workflow = SupportConciergeWorkflow.Build(triageAgent, researchAgent, responseAgent, critic, orchestrator, toolRegistry);
+        var workflow = SupportConciergeWorkflow.Build(triageAgent, researchAgent, responseAgent, critic, orchestrator, toolRegistry, gitHubTool);
 
         // Execute workflow
         Console.WriteLine("[MAF] Executing workflow...");
         var workflowRun = await InProcessExecution.RunAsync(workflow, input);
 
-        // Extract result from workflow execution - the Run object contains execution history
-        // For now, create a result context with the execution summary
-        var resultContext = new RunContext 
-        { 
-            Issue = input.Issue, 
-            Repository = input.Repository,
-            ShouldFinalize = true 
+        var resultContext = TryGetRunContext(workflowRun) ?? new RunContext
+        {
+            Issue = input.Issue,
+            Repository = input.Repository
         };
 
+        // Extract result from workflow execution - the Run object contains execution history
+        // For now, create a result context with the execution summary
         Console.WriteLine($"\n[MAF Final Decision] {ResolveDecision(resultContext)}");
         Console.WriteLine($"[Metrics] Tokens used: {metricsRecord.TokenUsage.TotalTokens}");
         Console.WriteLine("[MAF] Workflow completed successfully");
+
+        await WriteMetricsAsync(metrics);
 
         return 0;
     }
@@ -195,5 +199,34 @@ public static class Program
         }
 
         return "unknown";
+    }
+
+    private static RunContext? TryGetRunContext(object? workflowRun)
+    {
+        if (workflowRun == null)
+        {
+            return null;
+        }
+
+        var type = workflowRun.GetType();
+        var outputProperty = type.GetProperty("Output") ?? type.GetProperty("Result") ?? type.GetProperty("OutputValue");
+        var output = outputProperty?.GetValue(workflowRun);
+        return output as RunContext;
+    }
+
+    private static async Task WriteMetricsAsync(MetricsTool metrics)
+    {
+        var metricsDir = Environment.GetEnvironmentVariable("SUPPORTBOT_METRICS_DIR") ?? "artifacts/metrics";
+        var fileName = $"metrics_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{metrics.Record.RunId}.json";
+
+        try
+        {
+            await metrics.WriteAsync(metricsDir, fileName);
+            Console.WriteLine($"[Metrics] Saved to {metricsDir}/{fileName}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Metrics] Failed to write metrics: {ex.Message}");
+        }
     }
 }

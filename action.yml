@@ -28,7 +28,7 @@ inputs:
   write-mode:
     description: 'If true, bot can post comments (requires dry-run=false)'
     required: false
-    default: 'false'
+    default: 'true'
   spec-dir:
     description: 'Path to spec pack directory (categories, playbooks, validators)'
     required: false

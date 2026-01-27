@@ -42,7 +42,7 @@ public sealed class ResponseExecutor : Executor<RunContext, RunContext>
         var responseCritique = await _criticAgent.CritiqueResponseAsync(input, input.Brief, null, ct);
         if (!responseCritique.IsPassable)
         {
-            Console.WriteLine($"[MAF] Response: Failed critique (score: {responseCritique.Score}/10), refining...");
+            Console.WriteLine($"[MAF] Response (Critique): Failed critique (score: {responseCritique.Score}/10), refining...");
             responseResult = await _responseAgent.RefineAsync(input, triageResult, investigationResult, responseResult, responseCritique, ct);
             input.Brief = new EngineerBrief
             {
@@ -56,7 +56,7 @@ public sealed class ResponseExecutor : Executor<RunContext, RunContext>
         }
         else
         {
-            Console.WriteLine($"[MAF] Response: Passed critique (score: {responseCritique.Score}/10)");
+            Console.WriteLine($"[MAF] Response (Critique): Passed critique (score: {responseCritique.Score}/10)");
         }
 
         input.ResponseResult = responseResult;

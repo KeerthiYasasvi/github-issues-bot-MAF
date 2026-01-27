@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SupportConcierge.Core.Models;
+using SupportConcierge.Core.Prompts;
 using SupportConcierge.Core.Schemas;
 using SupportConcierge.Core.Tools;
 
@@ -49,35 +50,22 @@ public class EnhancedTriageAgent
         var schema = OrchestrationSchemas.GetTriageRefinementSchema();
         var categoriesJson = string.Join(", ", PredefinedCategories.Select(c => $"\"{c}\""));
 
-        var prompt = $@"You are an expert at classifying and analyzing GitHub issues.
-
-Issue Title: {context.Issue.Title}
-Issue Body: {context.Issue.Body}
-
-Analyze this issue and provide:
-1. Primary category (choose from: {categoriesJson} or suggest custom if none fit)
-2. Any secondary categories that apply
-3. Extracted key details (error messages, versions, environment info, etc.)
-4. Your confidence score (0-1) that these categories are correct
-
-If confidence < 0.75 due to unclear requirements, suggest a custom category with:
-- Custom category name (if applicable)
-- Description of what makes it unique
-- Required fields for proper handling
-
-Return structured JSON with:
-- categories: Array of applicable categories
-- custom_category: Optional object if creating new category (null if using predefined)
-- extracted_details: Object with key details found
-- confidence_score: 0-1
-- reasoning: Why these categories were chosen";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "triage-classify.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
+                ["CATEGORIES_JSON"] = categoriesJson
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are an expert GitHub issue classifier. Be precise in categorization and confident in your choices, or declare uncertainty with custom categories." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "TriageRefinement",
@@ -105,42 +93,27 @@ Return structured JSON with:
 
         var suggestionsText = string.Join("\n", critiqueFeedback.Suggestions.Take(3));
 
-        var prompt = $@"You are refining GitHub issue triage based on quality feedback.
-
-Issue Title: {context.Issue.Title}
-Issue Body: {context.Issue.Body}
-
-Previous Classification:
-- Categories: {string.Join(", ", previousResult.Categories)}
-- Confidence: {previousResult.ConfidenceScore:P}
-- Custom Category: {(previousResult.CustomCategory?.Name ?? "None")}
-
-Quality Feedback (Score: {critiqueFeedback.Score}/10):
-Issues Found:
-{issuesText}
-
-Suggestions:
-{suggestionsText}
-
-Refine the classification addressing the feedback:
-1. Keep categories accurate to the core issue
-2. If previous confidence was low, consider custom category approach
-3. Extract more complete details if missing
-4. Improve confidence assessment
-
-Return refined JSON with:
-- categories: Refined category list
-- custom_category: Updated or new custom category (null if using predefined)
-- extracted_details: More complete extraction
-- confidence_score: Updated confidence (likely higher after refinement)
-- reasoning: What was adjusted and why";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "triage-refine.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
+                ["PREV_CATEGORIES"] = string.Join(", ", previousResult.Categories),
+                ["PREV_CONFIDENCE"] = previousResult.ConfidenceScore.ToString("P"),
+                ["PREV_CUSTOM_CATEGORY"] = previousResult.CustomCategory?.Name ?? "None",
+                ["CRITIQUE_SCORE"] = critiqueFeedback.Score.ToString("0.##"),
+                ["CRITIQUE_ISSUES"] = issuesText,
+                ["CRITIQUE_SUGGESTIONS"] = suggestionsText
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are an expert at refining issue classification based on quality feedback. Address specific concerns raised." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "TriageRefinement",

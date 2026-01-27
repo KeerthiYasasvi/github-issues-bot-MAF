@@ -31,8 +31,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.API_KEY }}
           OPENAI_MODEL: ${{ vars.PRIMARY_MODEL }}
           OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL }}
-          SUPPORTBOT_DRY_RUN: ${{ vars.SUPPORTBOT_DRY_RUN || 'true' }}
-          SUPPORTBOT_WRITE_MODE: ${{ vars.SUPPORTBOT_WRITE_MODE || 'false' }}
+          SUPPORTBOT_DRY_RUN: ${{ vars.SUPPORTBOT_DRY_RUN || 'false' }}
+          SUPPORTBOT_WRITE_MODE: ${{ vars.SUPPORTBOT_WRITE_MODE || 'true' }}
           SUPPORTBOT_SPEC_DIR: ${{ vars.SUPPORTBOT_SPEC_DIR || '.supportbot' }}
           SUPPORTBOT_METRICS_DIR: artifacts/metrics
 

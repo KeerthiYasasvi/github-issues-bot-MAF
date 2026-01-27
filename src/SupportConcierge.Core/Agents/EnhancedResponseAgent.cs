@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SupportConcierge.Core.Models;
+using SupportConcierge.Core.Prompts;
 using SupportConcierge.Core.Schemas;
 using SupportConcierge.Core.Tools;
 
@@ -43,34 +44,23 @@ public class EnhancedResponseAgent
         var findingsText = string.Join("\n", investigationResult.Findings
             .Select(f => $"- [{f.FindingType}] {f.Content} (from {f.Source}, confidence: {f.Confidence})"));
 
-        var prompt = $@"You are generating a support response for a GitHub issue.
-
-Issue Title: {context.Issue.Title}
-Issue Body: {context.Issue.Body}
-Categories: {categoriesText}
-
-Investigation Findings:
-{findingsText}
-
-Generate a comprehensive response that:
-1. Acknowledges the issue and its context
-2. Explains the root cause based on findings
-3. Provides clear solution(s) and next steps
-4. Maintains a helpful and professional tone
-5. Offers follow-up support if needed
-
-Return JSON with:
-- brief: Object containing title, summary, solution, explanation, next_steps
-- follow_ups: Array of potential follow-up questions (not decided yet)
-- requires_user_action: Boolean - does user need to do something?
-- escalation_needed: Boolean - does this need human review?";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "response-generate.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
+                ["CATEGORIES"] = categoriesText,
+                ["FINDINGS"] = findingsText
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are an expert support agent generating clear, helpful responses to GitHub issues." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "ResponseGeneration",
@@ -126,32 +116,23 @@ Return JSON with:
 
         var categoriesText = string.Join(", ", triageResult.Categories);
 
-        var prompt = $@"You are generating follow-up questions for a GitHub issue support case.
-
-Issue Title: {context.Issue.Title}
-Categories: {categoriesText}
-
-Our Response:
-Title: {previousResponse.Brief.Title}
-Summary: {previousResponse.Brief.Summary}
-
-Generate strategic follow-up questions that:
-1. Clarify any ambiguities in the original issue
-2. Request additional context needed for next steps
-3. Help validate that the solution works for the user
-4. Prioritize by importance (high/medium/low)
-
-Return JSON with:
-- follow_up_questions: Array of questions with rationale and priority
-- clarification_needed: What specific clarification do we need?
-- additional_context_request: What context would help?";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "response-followup.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["CATEGORIES"] = categoriesText,
+                ["RESPONSE_TITLE"] = previousResponse.Brief.Title ?? string.Empty,
+                ["RESPONSE_SUMMARY"] = previousResponse.Brief.Summary ?? string.Empty
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are expert at generating strategic follow-up questions that move resolution forward." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "FollowUpGeneration",
@@ -180,41 +161,27 @@ Return JSON with:
 
         var suggestionsText = string.Join("\n", critiqueFeedback.Suggestions.Take(5));
 
-        var prompt = $@"You are refining a support response based on quality feedback.
-
-Issue Title: {context.Issue.Title}
-Categories: {string.Join(", ", triageResult.Categories)}
-
-Previous Response:
-Title: {previousResponse.Brief.Title}
-Summary: {previousResponse.Brief.Summary}
-Solution: {previousResponse.Brief.Solution}
-
-Quality Feedback (Score: {critiqueFeedback.Score}/10):
-Issues Identified:
-{issuesText}
-
-Improvement Suggestions:
-{suggestionsText}
-
-Refine the response addressing all feedback:
-1. Fix identified accuracy or clarity issues
-2. Incorporate improvement suggestions
-3. Maintain professional, helpful tone
-4. Ensure next steps are clear and actionable
-
-Return refined JSON with:
-- brief: Enhanced brief object with improved title, summary, solution, explanation, next_steps
-- follow_ups: Updated follow-up questions if relevant
-- requires_user_action: Boolean assessment
-- escalation_needed: Boolean assessment";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "response-refine.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["CATEGORIES"] = string.Join(", ", triageResult.Categories),
+                ["PREV_TITLE"] = previousResponse.Brief.Title ?? string.Empty,
+                ["PREV_SUMMARY"] = previousResponse.Brief.Summary ?? string.Empty,
+                ["PREV_SOLUTION"] = previousResponse.Brief.Solution ?? string.Empty,
+                ["CRITIQUE_SCORE"] = critiqueFeedback.Score.ToString("0.##"),
+                ["CRITIQUE_ISSUES"] = issuesText,
+                ["CRITIQUE_SUGGESTIONS"] = suggestionsText
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are expert at refining support responses based on quality feedback." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "ResponseGeneration",

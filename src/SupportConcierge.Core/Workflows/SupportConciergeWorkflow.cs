@@ -21,7 +21,8 @@ public static class SupportConciergeWorkflow
         EnhancedResponseAgent responseAgent,
         CriticAgent criticAgent,
         OrchestratorAgent orchestratorAgent,
-        ToolRegistry toolRegistry)
+        ToolRegistry toolRegistry,
+        IGitHubTool gitHubTool)
     {
         // Create executors
         var parseEvent = new ParseEventExecutor();
@@ -30,6 +31,7 @@ public static class SupportConciergeWorkflow
         var research = new ResearchExecutor(researchAgent, criticAgent, toolRegistry);
         var response = new ResponseExecutor(responseAgent, criticAgent);
         var orchestratorEvaluate = new OrchestratorEvaluateExecutor(orchestratorAgent);
+        var postComment = new PostCommentExecutor(gitHubTool);
         var persistState = new PersistStateExecutor();
 
         // Build workflow DAG
@@ -39,6 +41,7 @@ public static class SupportConciergeWorkflow
             .BindExecutor(research)
             .BindExecutor(response)
             .BindExecutor(orchestratorEvaluate)
+            .BindExecutor(postComment)
             .BindExecutor(persistState);
 
         // Linear edges: parseEvent → guardrails → triage → research → response → orchestratorEvaluate → persistState
@@ -58,9 +61,10 @@ public static class SupportConciergeWorkflow
         builder.AddEdge(response, orchestratorEvaluate);
 
         // After orchestrator evaluates, decide next action
-        // If finalize or escalate or follow_up, persist and exit
-        builder.AddEdge<RunContext>(orchestratorEvaluate, persistState, ctx => 
+        // If finalize or escalate or follow_up, post comment then persist and exit
+        builder.AddEdge<RunContext>(orchestratorEvaluate, postComment, ctx =>
             (ctx?.ShouldFinalize ?? false) || (ctx?.ShouldEscalate ?? false) || (ctx?.ShouldAskFollowUps ?? false) || ((ctx?.CurrentLoopCount ?? 0) >= 3));
+        builder.AddEdge(postComment, persistState);
 
         // If loop < 3 and no terminal decision, loop back to triage
         builder.AddEdge<RunContext>(orchestratorEvaluate, triage, ctx => 

@@ -21,11 +21,16 @@ public sealed class ParseEventExecutor : Executor<EventInput, RunContext>
             Issue = input.Issue,
             Repository = input.Repository,
             IncomingComment = input.Comment,
-            DryRun = false,
-            WriteMode = false
+            DryRun = ParseBool(Environment.GetEnvironmentVariable("SUPPORTBOT_DRY_RUN")),
+            WriteMode = ParseBool(Environment.GetEnvironmentVariable("SUPPORTBOT_WRITE_MODE"))
         };
 
         Console.WriteLine($"[MAF] ParseEvent: Issue #{runContext.Issue.Number}: {runContext.Issue.Title}");
         return new ValueTask<RunContext>(runContext);
+    }
+
+    private static bool ParseBool(string? value)
+    {
+        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 }

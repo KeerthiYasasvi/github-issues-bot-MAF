@@ -37,14 +37,14 @@ public sealed class TriageExecutor : Executor<RunContext, RunContext>
         var triageCritique = await _criticAgent.CritiqueTriageAsync(input, input.CategoryDecision, ct);
         if (!triageCritique.IsPassable)
         {
-            Console.WriteLine($"[MAF] Triage: Failed critique (score: {triageCritique.Score}/10), refining...");
+            Console.WriteLine($"[MAF] Triage (Critique): Failed critique (score: {triageCritique.Score}/10), refining...");
             triageResult = await _triageAgent.RefineAsync(input, triageResult, triageCritique, ct);
             input.CategoryDecision.Category = triageResult.Categories.FirstOrDefault() ?? "unclassified";
             Console.WriteLine($"[MAF] Triage: Refined category = {input.CategoryDecision.Category}");
         }
         else
         {
-            Console.WriteLine($"[MAF] Triage: Passed critique (score: {triageCritique.Score}/10)");
+            Console.WriteLine($"[MAF] Triage (Critique): Passed critique (score: {triageCritique.Score}/10)");
         }
 
         input.TriageResult = triageResult;

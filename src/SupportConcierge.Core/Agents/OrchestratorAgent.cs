@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SupportConcierge.Core.Models;
+using SupportConcierge.Core.Prompts;
 using SupportConcierge.Core.Schemas;
 using SupportConcierge.Core.Tools;
 
@@ -36,30 +37,21 @@ public class OrchestratorAgent
     {
         var schema = OrchestrationSchemas.GetPlanSchema();
         
-        var prompt = $@"You are the orchestrator for a GitHub issue support bot. Analyze this issue and create a structured plan.
-
-Issue Title: {context.Issue.Title}
-Issue Body: {context.Issue.Body}
-
-Your task is to:
-1. Understand the core problem
-2. Identify what information is needed
-3. Plan investigation steps
-4. Determine if you can likely resolve it within 3 loops
-
-Output a JSON plan with:
-- problem_summary: Brief understanding of the issue
-- information_needed: Key details to investigate
-- investigation_steps: Ordered list of what to investigate
-- likely_resolution: Can this be resolved? (true/false)
-- reasoning: Why/why not can it be resolved";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "orchestrator-plan.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are an expert issue triage orchestrator. Analyze issues and create actionable investigation plans." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "OrchestratorPlan",
@@ -222,26 +214,23 @@ Output a JSON plan with:
         
         var failedStepsText = string.Join("\n- ", failedSteps);
         
-        var prompt = $@"You are the orchestrator for a GitHub issue support bot. Previous investigation steps failed.
-
-Issue Title: {context.Issue.Title}
-Current Problem Summary: {currentPlan.ProblemSummary}
-
-Failed Investigation Steps:
-- {failedStepsText}
-
-Previous Information Needed:
-- {string.Join("\n- ", currentPlan.InformationNeeded)}
-
-Replan the investigation with different approaches. Avoid the failed steps.
-Output updated plan with new investigation_steps, modified information_needed, and reasoning for the changes.";
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "orchestrator-replan.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["PROBLEM_SUMMARY"] = currentPlan.ProblemSummary ?? string.Empty,
+                ["FAILED_STEPS"] = $"- {failedStepsText}",
+                ["INFO_NEEDED"] = $"- {string.Join("\n- ", currentPlan.InformationNeeded)}"
+            },
+            cancellationToken);
 
         var request = new LlmRequest
         {
             Messages = new List<LlmMessage>
             {
-                new() { Role = "system", Content = "You are an expert issue triage orchestrator. Adapt investigation plans when initial approaches fail." },
-                new() { Role = "user", Content = prompt }
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
             },
             JsonSchema = schema,
             SchemaName = "OrchestratorPlan",

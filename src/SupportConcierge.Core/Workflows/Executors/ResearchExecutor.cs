@@ -55,14 +55,14 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         var researchCritique = await _criticAgent.CritiqueResearchAsync(input, null, investigationResult.Findings.Select(f => f.Content).ToList(), ct);
         if (!researchCritique.IsPassable)
         {
-            Console.WriteLine($"[MAF] Research: Failed critique (score: {researchCritique.Score}/10), performing deep dive...");
+            Console.WriteLine($"[MAF] Research (Critique): Failed critique (score: {researchCritique.Score}/10), performing deep dive...");
             var deepDiveResults = await _researchAgent.DeepDiveAsync(input, triageResult, investigationResult, researchCritique, new Dictionary<string, string>(), ct);
             investigationResult = deepDiveResults;
             Console.WriteLine($"[MAF] Research: Deep dive completed, now {investigationResult.Findings.Count} findings");
         }
         else
         {
-            Console.WriteLine($"[MAF] Research: Passed critique (score: {researchCritique.Score}/10)");
+            Console.WriteLine($"[MAF] Research (Critique): Passed critique (score: {researchCritique.Score}/10)");
         }
 
         input.InvestigationResult = investigationResult;
