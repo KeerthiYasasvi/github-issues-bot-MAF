@@ -80,7 +80,13 @@ public static class Program
         Console.WriteLine("[MAF] Executing workflow...");
         var workflowRun = await InProcessExecution.RunAsync(workflow, input);
 
-        var resultContext = TryGetRunContext(workflowRun) ?? new RunContext
+        var resultContext = TryGetRunContext(workflowRun);
+        if (resultContext == null && workflowRun != null)
+        {
+            Console.WriteLine($"[MAF] Unable to extract RunContext from workflow result type: {workflowRun.GetType().FullName}");
+        }
+
+        resultContext ??= new RunContext
         {
             Issue = input.Issue,
             Repository = input.Repository
@@ -208,7 +214,7 @@ public static class Program
             return null;
         }
 
-        return ExtractRunContext(workflowRun, maxDepth: 2);
+        return ExtractRunContext(workflowRun, maxDepth: 4);
     }
 
     private static RunContext? ExtractRunContext(object? value, int maxDepth)
@@ -229,14 +235,31 @@ public static class Program
         }
 
         var type = value.GetType();
-        var outputProperty = type.GetProperty("Output") ?? type.GetProperty("Result") ?? type.GetProperty("OutputValue") ?? type.GetProperty("Outputs");
+        var outputProperty = type.GetProperty("Output")
+            ?? type.GetProperty("Result")
+            ?? type.GetProperty("OutputValue")
+            ?? type.GetProperty("Outputs")
+            ?? type.GetProperty("Value")
+            ?? type.GetProperty("ValueAsObject")
+            ?? type.GetProperty("Context")
+            ?? type.GetProperty("State")
+            ?? type.GetProperty("Data")
+            ?? type.GetProperty("Item")
+            ?? type.GetProperty("ResultContext");
         if (outputProperty != null)
         {
-            var output = outputProperty.GetValue(value);
-            var fromOutput = ExtractRunContext(output, maxDepth - 1);
-            if (fromOutput != null)
+            try
             {
-                return fromOutput;
+                var output = outputProperty.GetValue(value);
+                var fromOutput = ExtractRunContext(output, maxDepth - 1);
+                if (fromOutput != null)
+                {
+                    return fromOutput;
+                }
+            }
+            catch
+            {
+                // Ignore reflection errors and continue scanning.
             }
         }
 
@@ -259,11 +282,18 @@ public static class Program
                 continue;
             }
 
-            var propertyValue = property.GetValue(value);
-            var fromProperty = ExtractRunContext(propertyValue, maxDepth - 1);
-            if (fromProperty != null)
+            try
             {
-                return fromProperty;
+                var propertyValue = property.GetValue(value);
+                var fromProperty = ExtractRunContext(propertyValue, maxDepth - 1);
+                if (fromProperty != null)
+                {
+                    return fromProperty;
+                }
+            }
+            catch
+            {
+                // Ignore properties that throw on access.
             }
         }
 
