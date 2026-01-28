@@ -30,6 +30,20 @@ public sealed class GuardrailsExecutor : Executor<RunContext, RunContext>
         var issueAuthor = input.Issue?.User?.Login ?? string.Empty;
         var incomingCommentAuthor = input.IncomingComment?.User?.Login ?? string.Empty;
 
+        // Get bot username from environment (check both possible values)
+        var preferredBotUsername = Environment.GetEnvironmentVariable("SUPPORTBOT_USERNAME") ?? "github-actions[bot]";
+        var actualBotUsername = Environment.GetEnvironmentVariable("GITHUB_ACTOR") ?? preferredBotUsername;
+
+        // CRITICAL FIX: Ignore comments from the bot itself (prevents infinite loop)
+        if (input.EventName == "issue_comment" && 
+            (incomingCommentAuthor == preferredBotUsername || incomingCommentAuthor == actualBotUsername))
+        {
+            Console.WriteLine($"[MAF] Guardrails: Comment from bot ({incomingCommentAuthor}). Ignoring to prevent loop.");
+            input.ShouldStop = true;
+            input.StopReason = "Bot comment - ignoring to prevent infinite loop";
+            return new ValueTask<RunContext>(input);
+        }
+
         // Determine the active participant
         if (input.EventName == "issue_comment" && !string.IsNullOrWhiteSpace(incomingCommentAuthor))
         {
