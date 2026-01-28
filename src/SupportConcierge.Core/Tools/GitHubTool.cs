@@ -15,7 +15,7 @@ public sealed class GitHubTool : IGitHubTool
     {
         _dryRun = dryRun;
         _writeMode = writeMode;
-        _httpClient = httpClient ?? new HttpClient { BaseAddress = new Uri("https://api.github.com/") };
+        _httpClient = httpClient ?? new HttpClient();
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SupportConcierge", "1.0"));
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
@@ -23,12 +23,28 @@ public sealed class GitHubTool : IGitHubTool
 
     public async Task<List<GitHubComment>> GetIssueCommentsAsync(string owner, string repo, int issueNumber, CancellationToken cancellationToken = default)
     {
-        var url = $"repos/{owner}/{repo}/issues/{issueNumber}/comments";
+        var url = $"https://api.github.com/repos/{owner}/{repo}/issues/{issueNumber}/comments";
         var response = await _httpClient.GetAsync(url, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return JsonSerializer.Deserialize<List<GitHubComment>>(json) ?? new List<GitHubComment>();
+    }
+
+    private async Task<string?> GetIssueNodeIdAsync(string owner, string repo, int issueNumber, CancellationToken cancellationToken = default)
+    {
+        var url = $"https://api.github.com/repos/{owner}/{repo}/issues/{issueNumber}";
+        var response = await _httpClient.GetAsync(url, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var element = JsonSerializer.Deserialize<JsonElement>(json);
+        if (element.TryGetProperty("node_id", out var nodeIdElement))
+        {
+            return nodeIdElement.GetString();
+        }
+
+        return null;
     }
 
     public async Task<GitHubComment?> PostCommentAsync(string owner, string repo, int issueNumber, string body, CancellationToken cancellationToken = default)
@@ -38,15 +54,60 @@ public sealed class GitHubTool : IGitHubTool
             return null;
         }
 
-        var url = $"repos/{owner}/{repo}/issues/{issueNumber}/comments";
-        var request = new CreateCommentRequest { Body = body };
-        var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+        // Get the issue's node ID (required for GraphQL)
+        var nodeId = await GetIssueNodeIdAsync(owner, repo, issueNumber, cancellationToken);
+        if (string.IsNullOrEmpty(nodeId))
+        {
+            throw new InvalidOperationException($"Could not retrieve node ID for issue #{issueNumber}");
+        }
 
-        var response = await _httpClient.PostAsync(url, content, cancellationToken);
+        // Use GraphQL mutation to post comment as github-actions[bot]
+        var mutation = new
+        {
+            query = @"
+                mutation AddComment($subjectId: ID!, $body: String!) {
+                    addComment(input: {subjectId: $subjectId, body: $body}) {
+                        commentEdge {
+                            node {
+                                id
+                                body
+                                createdAt
+                            }
+                        }
+                    }
+                }",
+            variables = new
+            {
+                subjectId = nodeId,
+                body = body
+            }
+        };
+
+        var content = new StringContent(JsonSerializer.Serialize(mutation), Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync("https://api.github.com/graphql", content, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonSerializer.Deserialize<GitHubComment>(json);
+        var result = JsonSerializer.Deserialize<JsonElement>(json);
+        
+        // Extract comment info from GraphQL response
+        if (result.TryGetProperty("data", out var data) &&
+            data.TryGetProperty("addComment", out var addComment) &&
+            addComment.TryGetProperty("commentEdge", out var commentEdge) &&
+            commentEdge.TryGetProperty("node", out var node))
+        {
+            // For GraphQL responses, we return a minimal GitHubComment
+            // The numeric ID and DateTime are not directly available in GraphQL node format
+            return new GitHubComment
+            {
+                Id = 0, // GraphQL node IDs are different format, but we don't use this field after posting
+                Body = node.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? string.Empty : string.Empty,
+                CreatedAt = DateTime.UtcNow, // Approximate - the exact time is in the response but in ISO 8601 string format
+                User = new GitHubUser { Login = "github-actions[bot]" }
+            };
+        }
+
+        return null;
     }
 
     public async Task AddLabelsAsync(string owner, string repo, int issueNumber, List<string> labels, CancellationToken cancellationToken = default)
@@ -56,7 +117,7 @@ public sealed class GitHubTool : IGitHubTool
             return;
         }
 
-        var url = $"repos/{owner}/{repo}/issues/{issueNumber}/labels";
+        var url = $"https://api.github.com/repos/{owner}/{repo}/issues/{issueNumber}/labels";
         var request = new AddLabelsRequest { Labels = labels };
         var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync(url, content, cancellationToken);
@@ -70,7 +131,7 @@ public sealed class GitHubTool : IGitHubTool
             return;
         }
 
-        var url = $"repos/{owner}/{repo}/issues/{issueNumber}/assignees";
+        var url = $"https://api.github.com/repos/{owner}/{repo}/issues/{issueNumber}/assignees";
         var request = new AddAssigneesRequest { Assignees = assignees };
         var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync(url, content, cancellationToken);
@@ -79,7 +140,7 @@ public sealed class GitHubTool : IGitHubTool
 
     public async Task<string> GetFileContentAsync(string owner, string repo, string path, string? branch = null, CancellationToken cancellationToken = default)
     {
-        var url = $"repos/{owner}/{repo}/contents/{path}";
+        var url = $"https://api.github.com/repos/{owner}/{repo}/contents/{path}";
         if (!string.IsNullOrEmpty(branch))
         {
             url += $"?ref={branch}";
@@ -108,7 +169,7 @@ public sealed class GitHubTool : IGitHubTool
     {
         var searchQuery = $"repo:{owner}/{repo} is:issue {query}";
         var encoded = Uri.EscapeDataString(searchQuery);
-        var url = $"search/issues?q={encoded}&per_page={maxResults}&sort=created&order=desc";
+        var url = $"https://api.github.com/search/issues?q={encoded}&per_page={maxResults}&sort=created&order=desc";
 
         var response = await _httpClient.GetAsync(url, cancellationToken);
         if (!response.IsSuccessStatusCode)
