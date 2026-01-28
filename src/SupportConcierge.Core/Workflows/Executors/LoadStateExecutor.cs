@@ -54,26 +54,38 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
                 return input;
             }
 
-            // Get bot username
-            var botUsername = Environment.GetEnvironmentVariable("GITHUB_ACTOR") ?? "github-actions[bot]";
+            // Get bot username from environment
+            // Check both SUPPORTBOT_USERNAME (preferred) and GITHUB_ACTOR (fallback)
+            var preferredBotUsername = Environment.GetEnvironmentVariable("SUPPORTBOT_USERNAME") ?? "github-actions[bot]";
+            var actualBotUsername = Environment.GetEnvironmentVariable("GITHUB_ACTOR") ?? preferredBotUsername;
+            
+            Console.WriteLine($"[MAF] LoadState: Looking for bot comments from: preferred={preferredBotUsername}, actual={actualBotUsername}");
 
             // Find the latest bot comment with state
             BotState? loadedState = null;
             foreach (var comment in comments.OrderByDescending(c => c.CreatedAt))
             {
-                // Only check bot comments
-                if (comment.User?.Login != botUsername)
-                {
-                    continue;
-                }
-
-                // Extract state from this comment
+                var commentAuthor = comment.User?.Login ?? string.Empty;
+                
+                // Try to extract state from this comment first
                 var state = _stateTool.ExtractState(comment.Body ?? string.Empty);
-                if (state != null)
+                if (state == null)
+                {
+                    continue;  // No embedded state, skip
+                }
+                
+                // Check if this is a bot comment (check both preferred and actual bot usernames)
+                var isBotComment = commentAuthor == preferredBotUsername || commentAuthor == actualBotUsername;
+                
+                if (isBotComment)
                 {
                     loadedState = state;
-                    Console.WriteLine($"[MAF] LoadState: Found prior state - Category={state.Category}, Loop={state.LoopCount}, Finalized={state.IsFinalized}");
+                    Console.WriteLine($"[MAF] LoadState: Found prior state from {commentAuthor} - Category={state.Category}, Loop={state.LoopCount}, Finalized={state.IsFinalized}");
                     break;
+                }
+                else
+                {
+                    Console.WriteLine($"[MAF] LoadState: Skipping state from non-bot user {commentAuthor}");
                 }
             }
 
