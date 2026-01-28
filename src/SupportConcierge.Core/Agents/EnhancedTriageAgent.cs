@@ -108,6 +108,15 @@ public class EnhancedTriageAgent
 
         var suggestionsText = string.Join("\n", critiqueFeedback.Suggestions.Take(3));
 
+        // Track in execution state
+        if (context.ExecutionState != null)
+        {
+            context.ExecutionState.TriageScore = critiqueFeedback.Score;
+            context.ExecutionState.TriageCritiqueIssues = critiqueFeedback.Issues
+                .Select(i => $"{i.Problem}")
+                .ToList();
+        }
+
         var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
             "triage-refine.md",
             new Dictionary<string, string>

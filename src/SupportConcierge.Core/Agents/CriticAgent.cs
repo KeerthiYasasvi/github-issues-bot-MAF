@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using SupportConcierge.Core.Models;
 using SupportConcierge.Core.Prompts;
 using SupportConcierge.Core.Schemas;
@@ -182,8 +183,10 @@ public class CriticAgent
 
         try
         {
-            var json = JsonSerializer.Deserialize<JsonElement>(response.Content);
-            
+            // Extract clean JSON from potentially wrapped response
+            var cleanJson = ExtractJsonFromResponse(response.Content);
+            var json = JsonSerializer.Deserialize<JsonElement>(cleanJson);
+
             var issues = json.TryGetProperty("issues", out var issuesProperty)
                 ? issuesProperty.EnumerateArray()
                     .Select(x => new CritiqueIssue
@@ -241,6 +244,30 @@ public class CriticAgent
                 IsPassable = false
             };
         }
+    }
+
+    /// <summary>
+    /// Extracts clean JSON from potentially wrapped or markdown-formatted response
+    /// Handles cases where LLM returns: ```json\n{...}\n```, extra whitespace, escaping, etc.
+    /// </summary>
+    private string ExtractJsonFromResponse(string rawContent)
+    {
+        // Remove markdown code blocks (```json ... ``` or just ``` ... ```)
+        var cleanJson = Regex.Replace(
+            rawContent,
+            @"^```(?:json)?\s*\n?|\n?```$",
+            "",
+            RegexOptions.Multiline
+        ).Trim();
+
+        // Try to extract JSON object if wrapped in other text
+        var jsonMatch = Regex.Match(
+            cleanJson,
+            @"\{(?:[^{}]|(?:\{[^{}]*\}))*\}",
+            RegexOptions.Singleline
+        );
+
+        return jsonMatch.Success ? jsonMatch.Value : cleanJson;
     }
 
     private static void LogCritiqueFailure(string stage, string message, LlmResponse response, Exception? exception)

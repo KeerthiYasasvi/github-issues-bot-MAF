@@ -104,6 +104,11 @@ public class OrchestratorAgent
 
     /// <summary>
     /// Decide next step based on current state and progress
+    /// FIXED: Now properly implements the 3-loop user interaction pattern:
+    /// Loop 1: Ask questions with initial triage/research
+    /// Loop 2: With user answers, provide response or ask more questions
+    /// Loop 3: With user's final answers, provide final response with evidence/next-steps
+    /// Loop 4+: Escalate to human (user exhausted)
     /// </summary>
     public async Task<OrchestratorDecision> EvaluateProgressAsync(
         RunContext context,
@@ -112,12 +117,28 @@ public class OrchestratorAgent
         List<OrchestratorDecision> previousDecisions,
         CancellationToken cancellationToken = default)
     {
-        if (currentLoop >= MaxLoops)
+        // Check if user has exhausted loops (3 max)
+        const int maxUserLoops = 3;
+        
+        if (context.ExecutionState != null)
         {
+            context.ExecutionState.LoopNumber = currentLoop;
+            context.ExecutionState.TotalUserLoops = maxUserLoops;
+        }
+
+        // User has completed 3 loops - escalate
+        if (currentLoop > maxUserLoops)
+        {
+            if (context.ExecutionState != null)
+            {
+                context.ExecutionState.IsUserExhausted = true;
+                context.ExecutionState.LoopActionTaken = "escalate";
+            }
+
             return new OrchestratorDecision
             {
                 Action = "escalate",
-                Reasoning = $"Maximum loops ({MaxLoops}) reached. Escalating to human review.",
+                Reasoning = $"User has had {maxUserLoops} interactions. Escalating to human review.",
                 ConfidenceScore = 0.5m,
                 NextAgent = "human"
             };
@@ -127,35 +148,114 @@ public class OrchestratorAgent
         var hasEnoughInfo = context.CategoryDecision != null &&
                             context.CasePacket.Fields.Count > 0;
 
-        if (!hasEnoughInfo && currentLoop < MaxLoops - 1)
+        // Evaluate based on loop stage
+        return currentLoop switch
         {
-            return new OrchestratorDecision
+            1 => EvaluateFirstLoop(context, hasEnoughInfo),
+            2 => EvaluateSecondLoop(context, hasEnoughInfo),
+            3 => EvaluateThirdLoop(context, hasEnoughInfo),
+            _ => new OrchestratorDecision
             {
-                Action = "research",
-                Reasoning = "Need more information. Continuing research.",
-                ConfidenceScore = 0.7m,
-                NextAgent = "research_agent"
-            };
-        }
+                Action = "escalate",
+                Reasoning = "Loop limit exceeded",
+                ConfidenceScore = 0.3m,
+                NextAgent = "human"
+            }
+        };
+    }
 
-        // Ready to generate response
-        if (hasEnoughInfo || currentLoop == MaxLoops - 1)
+    /// <summary>
+    /// Loop 1: Triage + Research → Ask follow-up questions
+    /// Goal: Gather initial context and ask clarifying questions
+    /// </summary>
+    private OrchestratorDecision EvaluateFirstLoop(RunContext context, bool hasEnoughInfo)
+    {
+        if (context.ExecutionState != null)
         {
-            return new OrchestratorDecision
-            {
-                Action = "respond",
-                Reasoning = "Sufficient information gathered. Time to respond.",
-                ConfidenceScore = 0.8m,
-                NextAgent = "response_agent"
-            };
+            context.ExecutionState.LoopActionTaken = "ask_clarifying_questions";
         }
 
         return new OrchestratorDecision
         {
-            Action = "research",
-            Reasoning = "Continue information gathering.",
-            ConfidenceScore = 0.6m,
-            NextAgent = "research_agent"
+            Action = "respond_with_questions",
+            Reasoning = "First loop: Triage complete. Now asking user for clarification.",
+            ConfidenceScore = 0.7m,
+            NextAgent = "response_agent"
+        };
+    }
+
+    /// <summary>
+    /// Loop 2: User provides answers → Triage + Research with answers
+    /// Decision: Provide response OR ask more questions
+    /// </summary>
+    private OrchestratorDecision EvaluateSecondLoop(RunContext context, bool hasEnoughInfo)
+    {
+        if (!hasEnoughInfo)
+        {
+            if (context.ExecutionState != null)
+            {
+                context.ExecutionState.LoopActionTaken = "ask_more_questions";
+            }
+
+            return new OrchestratorDecision
+            {
+                Action = "respond_with_questions",
+                Reasoning = "Second loop: Still need more info. Asking additional clarifying questions.",
+                ConfidenceScore = 0.6m,
+                NextAgent = "response_agent"
+            };
+        }
+
+        // Have enough info - provide response
+        if (context.ExecutionState != null)
+        {
+            context.ExecutionState.LoopActionTaken = "provide_response";
+        }
+
+        return new OrchestratorDecision
+        {
+            Action = "respond",
+            Reasoning = "Second loop: Sufficient information from user. Providing automated response.",
+            ConfidenceScore = 0.8m,
+            NextAgent = "response_agent"
+        };
+    }
+
+    /// <summary>
+    /// Loop 3: Final loop → Provide comprehensive response with evidence
+    /// If still not enough info → Escalate
+    /// </summary>
+    private OrchestratorDecision EvaluateThirdLoop(RunContext context, bool hasEnoughInfo)
+    {
+        if (!hasEnoughInfo)
+        {
+            if (context.ExecutionState != null)
+            {
+                context.ExecutionState.LoopActionTaken = "escalate";
+                context.ExecutionState.IsUserExhausted = true;
+            }
+
+            return new OrchestratorDecision
+            {
+                Action = "escalate",
+                Reasoning = "Third loop: Insufficient information even after clarifications. Escalating to human.",
+                ConfidenceScore = 0.4m,
+                NextAgent = "human"
+            };
+        }
+
+        // Have enough info - provide final response with evidence
+        if (context.ExecutionState != null)
+        {
+            context.ExecutionState.LoopActionTaken = "provide_final_response";
+        }
+
+        return new OrchestratorDecision
+        {
+            Action = "respond",
+            Reasoning = "Third loop: Final response with key evidence and next steps.",
+            ConfidenceScore = 0.85m,
+            NextAgent = "response_agent"
         };
     }
 

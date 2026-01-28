@@ -60,6 +60,18 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
         else
         {
             Console.WriteLine($"[MAF] PostComment: Posted comment id {comment.Id}.");
+            
+            // Track that a comment was successfully posted - update last update time
+            if (input.ExecutionState != null)
+            {
+                input.ExecutionState.LastUpdate = DateTime.UtcNow;
+            }
+            
+            // Update loop count in state for next invocation
+            if (input.State != null)
+            {
+                input.State.LoopCount = input.CurrentLoopCount ?? 1;
+            }
         }
 
         return input;
@@ -89,7 +101,9 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
         if (input.ShouldAskFollowUps)
         {
             // Follow-up questions (formatted like previous project)
-            var loopCount = input.State?.LoopCount ?? 0;
+            var loopCount = input.State?.LoopCount ?? input.CurrentLoopCount ?? 1;
+            var maxLoops = input.ExecutionState?.TotalUserLoops ?? 3;
+            
             sb.AppendLine("I need a bit more information to help move this forward:");
             sb.AppendLine();
 
@@ -123,28 +137,56 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             sb.AppendLine("- If you need to restart analysis, comment with `/diagnose`");
             sb.AppendLine("- If you want me to stop, comment with `/stop`");
             sb.AppendLine();
-            sb.AppendLine($"_Loop {loopCount} of 3. I'll escalate to maintainer after 3 attempts if issue remains unclear._");
+            sb.AppendLine($"_Loop {loopCount} of {maxLoops}. I'll escalate to maintainer after {maxLoops} attempts if issue remains unclear._");
 
             return sb.ToString().Trim();
         }
 
         if (input.ShouldEscalate)
         {
-            // Escalation message
-            sb.AppendLine("I've attempted to gather information through multiple iterations, but the issue details remain unclear for automated processing.");
+            // Escalation message - now accurate based on ExecutionState
+            var execState = input.ExecutionState;
+            var loopNum = execState?.LoopNumber ?? input.CurrentLoopCount ?? 1;
+            var isUserExhausted = execState?.IsUserExhausted ?? (loopNum > 3);
+            
+            sb.AppendLine("I've attempted to analyze this issue but need human review to proceed effectively.");
             sb.AppendLine();
-            sb.AppendLine("**Escalating to maintainer review** for human assessment.");
+            sb.AppendLine("**Escalating to maintainer review** for expert assessment.");
             sb.AppendLine();
             sb.AppendLine("---");
             sb.AppendLine();
-            sb.AppendLine("What happened:");
-            sb.AppendLine("- ❌ I asked clarifying questions");
-            sb.AppendLine("- ❌ I analyzed the provided information");
-            sb.AppendLine("- ⚠️ I still need more context to proceed");
+            sb.AppendLine("**What happened:**");
+            
+            if (isUserExhausted)
+            {
+                sb.AppendLine($"- ✅ I completed {execState?.TotalUserLoops ?? 3} loops of interaction");
+                sb.AppendLine("- ✅ You provided responses to my clarifying questions");
+                sb.AppendLine("- ⚠️ Even with your answers, I cannot provide a confident automated response");
+                sb.AppendLine();
+                sb.AppendLine("Your issue may require:");
+                sb.AppendLine("- Expert knowledge of the codebase");
+                sb.AppendLine("- Access to internal systems or logs");
+                sb.AppendLine("- Complex troubleshooting beyond automated analysis");
+            }
+            else
+            {
+                sb.AppendLine("- I analyzed the issue details");
+                sb.AppendLine("- I need additional context to provide an accurate response");
+                sb.AppendLine();
+                sb.AppendLine("You can help by:");
+                sb.AppendLine("- Adding more details in a follow-up comment");
+                sb.AppendLine("- Sharing relevant error messages or logs");
+                sb.AppendLine("- Describing reproduction steps in detail");
+            }
+            
             sb.AppendLine();
-            sb.AppendLine("**You can still help by:**");
-            sb.AppendLine("- Adding more details in a follow-up comment");
-            sb.AppendLine("- Commenting with `/diagnose` to restart fresh analysis");
+            sb.AppendLine("---");
+            sb.AppendLine();
+            sb.AppendLine("**Next steps:**");
+            sb.AppendLine("- A maintainer will review your issue shortly");
+            sb.AppendLine("- If you have additional details, please share them in a comment below");
+            sb.AppendLine("- Use `/diagnose` to restart fresh analysis if needed");
+            
             return sb.ToString().Trim();
         }
 

@@ -59,4 +59,8 @@ public sealed class RunContext
     public OrchestratorPlan? Plan { get; set; }
     public List<OrchestratorDecision> Decisions { get; set; } = new();
     public int? CurrentLoopCount { get; set; }
+
+    // Execution state tracking for honest feedback and loop management
+    public ExecutionState? ExecutionState { get; set; } = new();
+    public UserLoopTracker? UserLoopTracker { get; set; }
 }
