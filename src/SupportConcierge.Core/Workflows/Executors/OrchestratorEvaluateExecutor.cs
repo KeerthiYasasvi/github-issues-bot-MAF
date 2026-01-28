@@ -19,7 +19,7 @@ public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunConte
 
     public override async ValueTask<RunContext> HandleAsync(RunContext input, IWorkflowContext context, CancellationToken ct = default)
     {
-        Console.WriteLine("[MAF] Orchestrator: Evaluating progress and deciding next action");
+        Console.WriteLine($"[MAF] Orchestrator: Evaluating progress for {input.ActiveParticipant}");
 
         // Initialize decisions list if not present
         if (input.Decisions == null)
@@ -33,9 +33,18 @@ public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunConte
             input.ExecutionState = new ExecutionState();
         }
 
-        // Track loop count
-        input.CurrentLoopCount = (input.CurrentLoopCount ?? 0) + 1;
-        Console.WriteLine($"[MAF] Orchestrator: Loop {input.CurrentLoopCount}/3");
+        // Track per-user loop count
+        if (input.ActiveUserConversation != null)
+        {
+            input.ActiveUserConversation.LoopCount++;
+            input.CurrentLoopCount = input.ActiveUserConversation.LoopCount;
+            Console.WriteLine($"[MAF] Orchestrator: {input.ActiveParticipant} Loop {input.CurrentLoopCount}/3");
+        }
+        else
+        {
+            Console.WriteLine("[MAF] Orchestrator: WARNING - No active user conversation");
+            input.CurrentLoopCount = (input.CurrentLoopCount ?? 0) + 1;
+        }
 
         // Update ExecutionState loop tracking
         input.ExecutionState.LoopNumber = input.CurrentLoopCount.Value;
@@ -65,12 +74,25 @@ public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunConte
         {
             input.ShouldFinalize = true;
             input.ExecutionState.LoopActionTaken = "provide_final_response";
+            
+            // Mark user conversation as finalized
+            if (input.ActiveUserConversation != null)
+            {
+                input.ActiveUserConversation.IsFinalized = true;
+                input.ActiveUserConversation.FinalizedAt = DateTime.UtcNow;
+            }
         }
         else if (decision.Action == "escalate")
         {
             input.ShouldEscalate = true;
             input.ExecutionState.LoopActionTaken = "escalate";
-            input.ExecutionState.IsUserExhausted = input.CurrentLoopCount > input.ExecutionState.TotalUserLoops;
+            input.ExecutionState.IsUserExhausted = input.CurrentLoopCount >= 3;
+            
+            // Mark user as exhausted
+            if (input.ActiveUserConversation != null)
+            {
+                input.ActiveUserConversation.IsExhausted = true;
+            }
         }
         else if (decision.Action == "respond_with_questions")
         {

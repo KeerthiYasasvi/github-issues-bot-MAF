@@ -11,13 +11,13 @@ namespace SupportConcierge.Core.Workflows.Executors;
 /// 1. Retrieves all comments on the issue
 /// 2. Finds the latest bot comment with embedded state
 /// 3. Extracts and validates the state
-/// 4. Populates RunContext with the state for decision-making
+/// 4. Populates RunContext with the global state and active user conversation
 /// 
-/// State persistence allows the bot to:
-/// - Remember the category assigned in loop 1
-/// - Track which fields have already been asked
-/// - Maintain loop count to enforce max 3 iterations
-/// - Prevent duplicate questions across workflow invocations
+/// Multi-user state persistence allows the bot to:
+/// - Track separate conversations per user (each with own loop count)
+/// - Remember which fields each user has been asked
+/// - Maintain per-user loop count to enforce max 3 iterations per user
+/// - Share findings across users while keeping conversations separate
 /// </summary>
 public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
 {
@@ -92,7 +92,68 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
             if (loadedState != null)
             {
                 input.State = loadedState;
-                input.CurrentLoopCount = loadedState.LoopCount;  // Initialize loop counter from persisted state
+                
+                // Migrate legacy single-user state to multi-user if needed
+                MigrateLegacyState(loadedState, input.Issue?.User?.Login ?? string.Empty);
+                
+                // Get or create user conversation for active participant
+                var activeUser = input.ActiveParticipant;
+                if (string.IsNullOrWhiteSpace(activeUser))
+                {
+                    activeUser = input.Issue?.User?.Login ?? string.Empty;
+                    input.ActiveParticipant = activeUser;
+                }
+
+                // Check if this is a /diagnose command - create new conversation
+                if (input.IsDiagnoseCommand)
+                {
+                    Console.WriteLine($"[MAF] LoadState: /diagnose detected - creating new conversation for {activeUser}");
+                    var newConv = new UserConversation
+                    {
+                        Username = activeUser,
+                        LoopCount = 0,
+                        IsExhausted = false,
+                        FirstInteraction = DateTime.UtcNow,
+                        LastInteraction = DateTime.UtcNow
+                    };
+                    loadedState.UserConversations[activeUser] = newConv;
+                    input.ActiveUserConversation = newConv;
+                }
+                else
+                {
+                    // Get or create conversation for active user
+                    if (!loadedState.UserConversations.TryGetValue(activeUser, out var userConv))
+                    {
+                        // Issue author gets automatic conversation
+                        if (activeUser == (input.Issue?.User?.Login ?? string.Empty))
+                        {
+                            Console.WriteLine($"[MAF] LoadState: Creating conversation for issue author {activeUser}");
+                            userConv = new UserConversation
+                            {
+                                Username = activeUser,
+                                LoopCount = 0,
+                                IsExhausted = false,
+                                FirstInteraction = DateTime.UtcNow,
+                                LastInteraction = DateTime.UtcNow
+                            };
+                            loadedState.UserConversations[activeUser] = userConv;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[MAF] LoadState: No conversation for {activeUser} and not issue author");
+                            // GuardrailsExecutor will handle this
+                        }
+                    }
+                    else
+                    {
+                        userConv.LastInteraction = DateTime.UtcNow;
+                        Console.WriteLine($"[MAF] LoadState: Loaded conversation for {activeUser} - Loop={userConv.LoopCount}, Finalized={userConv.IsFinalized}");
+                    }
+
+                    input.ActiveUserConversation = userConv;
+                }
+
+                input.CurrentLoopCount = input.ActiveUserConversation?.LoopCount ?? 0;
                 
                 // Validate that the issue author matches (security check)
                 var issueAuthor = input.Issue?.User?.Login ?? string.Empty;
@@ -102,14 +163,34 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
                     Console.WriteLine($"[MAF] LoadState: WARNING - State author mismatch: {loadedState.IssueAuthor} vs {issueAuthor}");
                     // Still load state but log warning
                 }
-
-                // Initialize participant from issue author
-                input.ActiveParticipant = issueAuthor;
             }
             else
             {
                 Console.WriteLine("[MAF] LoadState: No embedded state found in comments; starting fresh");
-                input.ActiveParticipant = input.Issue?.User?.Login ?? string.Empty;
+                
+                // Initialize new state with issue author conversation
+                var issueAuthor = input.Issue?.User?.Login ?? string.Empty;
+                input.ActiveParticipant = issueAuthor;
+                
+                var newState = new BotState
+                {
+                    IssueAuthor = issueAuthor,
+                    LastUpdated = DateTime.UtcNow
+                };
+
+                var authorConv = new UserConversation
+                {
+                    Username = issueAuthor,
+                    LoopCount = 0,
+                    IsExhausted = false,
+                    FirstInteraction = DateTime.UtcNow,
+                    LastInteraction = DateTime.UtcNow
+                };
+                
+                newState.UserConversations[issueAuthor] = authorConv;
+                input.State = newState;
+                input.ActiveUserConversation = authorConv;
+                input.CurrentLoopCount = 0;
             }
         }
         catch (Exception ex)
@@ -119,5 +200,34 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
         }
 
         return input;
+    }
+
+    /// <summary>
+    /// Migrate legacy single-user state to multi-user format
+    /// </summary>
+    private void MigrateLegacyState(BotState state, string issueAuthor)
+    {
+        // Check if state has legacy fields populated but no UserConversations
+#pragma warning disable CS0618 // Type or member is obsolete
+        if (state.UserConversations.Count == 0 && state.LoopCount > 0)
+        {
+            Console.WriteLine("[MAF] LoadState: Migrating legacy single-user state to multi-user format");
+            
+            var legacyConv = new UserConversation
+            {
+                Username = issueAuthor,
+                LoopCount = state.LoopCount,
+                IsExhausted = state.LoopCount >= 3,
+                FirstInteraction = state.LastUpdated,
+                LastInteraction = state.LastUpdated,
+                AskedFields = state.AskedFields.ToList(),
+                IsFinalized = state.IsFinalized,
+                FinalizedAt = state.FinalizedAt
+            };
+            
+            state.UserConversations[issueAuthor] = legacyConv;
+            Console.WriteLine($"[MAF] LoadState: Migrated legacy state - {issueAuthor} Loop={legacyConv.LoopCount}");
+        }
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 }

@@ -69,23 +69,38 @@ public sealed class StateStoreTool
 
     public BotState CreateInitialState(string category, string issueAuthor)
     {
-        return new BotState
+        var state = new BotState
         {
             Category = category,
-            LoopCount = 0,
-            AskedFields = new List<string>(),
             LastUpdated = DateTime.UtcNow,
             IssueAuthor = issueAuthor
         };
+
+        // Create initial conversation for issue author
+        var authorConv = new UserConversation
+        {
+            Username = issueAuthor,
+            LoopCount = 0,
+            IsExhausted = false,
+            FirstInteraction = DateTime.UtcNow,
+            LastInteraction = DateTime.UtcNow
+        };
+
+        state.UserConversations[issueAuthor] = authorConv;
+        return state;
     }
 
     public BotState PruneState(BotState state, int maxAskedFieldsHistory = 20)
     {
-        if (state.AskedFields.Count > maxAskedFieldsHistory)
+        // Prune each user conversation's asked fields
+        foreach (var userConv in state.UserConversations.Values)
         {
-            state.AskedFields = state.AskedFields
-                .Skip(state.AskedFields.Count - maxAskedFieldsHistory)
-                .ToList();
+            if (userConv.AskedFields.Count > maxAskedFieldsHistory)
+            {
+                userConv.AskedFields = userConv.AskedFields
+                    .Skip(userConv.AskedFields.Count - maxAskedFieldsHistory)
+                    .ToList();
+            }
         }
 
         return state;

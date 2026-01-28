@@ -8,11 +8,11 @@ namespace SupportConcierge.Core.Workflows.Executors;
 /// MAF Executor: Apply guardrails (stop command, author gating, loop limit, etc.)
 /// 
 /// Responsibilities:
-/// 1. Enforce author-only interactions (only issue author can interact with bot)
+/// 1. Build allow list: issue author + users who used /diagnose
 /// 2. Detect special commands (/stop, /diagnose)
-/// 3. Validate command permissions (only author can use these)
-/// 4. Enforce loop limit (max 3 iterations before escalation)
-/// 5. Check if issue is already finalized
+/// 3. Validate command permissions (only allowed users)
+/// 4. Enforce per-user loop limit (max 3 iterations per user)
+/// 5. Check if user conversation is already finalized
 /// </summary>
 public sealed class GuardrailsExecutor : Executor<RunContext, RunContext>
 {
@@ -54,83 +54,105 @@ public sealed class GuardrailsExecutor : Executor<RunContext, RunContext>
             input.ActiveParticipant = issueAuthor;
         }
 
-        // SECURITY: Author gating - only the issue author can interact with bot
-        if (input.EventName == "issue_comment" && incomingCommentAuthor != issueAuthor)
-        {
-            Console.WriteLine($"[MAF] Guardrails: Comment from {incomingCommentAuthor} (not author). Ignoring.");
-            input.ShouldStop = true;
-            input.StopReason = "Only issue author can interact with bot";
-            return new ValueTask<RunContext>(input);
-        }
-
         // Check for command parser
         var bodyText = (input.Issue?.Body ?? "") + " " + (input.IncomingComment?.Body ?? "");
         var commandInfo = CommandParser.Parse(bodyText);
+
+        // Build allow list: issue author + users who have used /diagnose
+        var allowedUsers = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { issueAuthor };
+        if (input.State?.UserConversations != null)
+        {
+            foreach (var username in input.State.UserConversations.Keys)
+            {
+                allowedUsers.Add(username);
+            }
+        }
+
+        // Handle /diagnose command - adds user to allow list
+        if (commandInfo.HasDiagnoseCommand)
+        {
+            input.IsDiagnoseCommand = true;
+            Console.WriteLine($"[MAF] Guardrails: /diagnose command from {input.ActiveParticipant} - adding to allow list");
+            
+            // Will be added to UserConversations in LoadStateExecutor
+            allowedUsers.Add(input.ActiveParticipant);
+        }
+
+        // SECURITY: Author gating - only allowed users can interact
+        if (input.EventName == "issue_comment" && !allowedUsers.Contains(incomingCommentAuthor))
+        {
+            Console.WriteLine($"[MAF] Guardrails: Comment from {incomingCommentAuthor} (not in allow list). Ignoring.");
+            Console.WriteLine($"[MAF] Guardrails: Allowed users: {string.Join(", ", allowedUsers)}");
+            Console.WriteLine($"[MAF] Guardrails: Hint: User must use /diagnose to join conversation");
+            input.ShouldStop = true;
+            input.StopReason = $"User {incomingCommentAuthor} not in allow list. Use /diagnose to join.";
+            return new ValueTask<RunContext>(input);
+        }
 
         if (commandInfo.HasStopCommand)
         {
             input.IsStopCommand = true;
             input.ShouldStop = true;
-            input.StopReason = "User invoked /stop command";
-            Console.WriteLine("[MAF] Guardrails: /stop command detected - marking as finalized");
+            input.StopReason = $"{input.ActiveParticipant} invoked /stop command";
+            Console.WriteLine($"[MAF] Guardrails: /stop command from {input.ActiveParticipant} - marking their conversation as finalized");
 
-            // Mark state as finalized if we have one
-            if (input.State != null)
+            // Mark user's conversation as finalized
+            if (input.State?.UserConversations != null && 
+                input.State.UserConversations.TryGetValue(input.ActiveParticipant, out var userConv))
             {
-                input.State.IsFinalized = true;
-                input.State.FinalizedAt = DateTime.UtcNow;
+                userConv.IsFinalized = true;
+                userConv.FinalizedAt = DateTime.UtcNow;
             }
             return new ValueTask<RunContext>(input);
         }
 
         if (commandInfo.HasDiagnoseCommand)
         {
-            input.IsDiagnoseCommand = true;
-            Console.WriteLine("[MAF] Guardrails: /diagnose command detected - resetting state for fresh analysis");
-
-            // Reset state to force fresh analysis
-            if (input.State != null)
-            {
-                input.State.LoopCount = 0;
-                input.State.AskedFields.Clear();
-                input.State.IsFinalized = false;
-                input.State.FinalizedAt = null;
-            }
+            // Already handled above - just log
+            Console.WriteLine($"[MAF] Guardrails: /diagnose command from {input.ActiveParticipant} - will start fresh conversation");
             // Continue processing normally
         }
 
-        // Check if already finalized (state from previous comment)
-        if (input.State?.IsFinalized ?? false)
+        // Check if this user's conversation is already finalized
+        if (input.State?.UserConversations != null &&
+            input.State.UserConversations.TryGetValue(input.ActiveParticipant, out var activeUserConv) &&
+            activeUserConv.IsFinalized)
         {
-            Console.WriteLine($"[MAF] Guardrails: Issue already finalized at {input.State.FinalizedAt}");
+            Console.WriteLine($"[MAF] Guardrails: {input.ActiveParticipant}'s conversation already finalized at {activeUserConv.FinalizedAt}");
 
-            // Check for disagreement (Scenario 7: allow regeneration if disagreement detected)
+            // Check for disagreement (allow regeneration if disagreement detected)
             if (input.EventName == "issue_comment" && input.IncomingComment != null)
             {
                 if (DisagreementDetector.IsDisagreement(input.IncomingComment.Body))
                 {
                     input.IsDisagreement = true;
-                    Console.WriteLine("[MAF] Guardrails: User disagreement detected - allowing brief regeneration");
+                    Console.WriteLine($"[MAF] Guardrails: {input.ActiveParticipant} disagreement detected - allowing brief regeneration");
                     // Continue processing to handle disagreement
                     return new ValueTask<RunContext>(input);
                 }
             }
 
             input.ShouldStop = true;
-            input.StopReason = "Issue already finalized";
+            input.StopReason = $"{input.ActiveParticipant}'s conversation already finalized";
             return new ValueTask<RunContext>(input);
         }
 
-        // Enforce loop limit
-        var currentLoop = input.State?.LoopCount ?? 0;
+        // Enforce per-user loop limit
+        var currentLoop = 0;
+        if (input.State?.UserConversations != null &&
+            input.State.UserConversations.TryGetValue(input.ActiveParticipant, out var userLoop))
+        {
+            currentLoop = userLoop.LoopCount;
+        }
+
         if (currentLoop >= MaxLoops)
         {
-            Console.WriteLine($"[MAF] Guardrails: Max loops ({MaxLoops}) reached - will escalate");
+            Console.WriteLine($"[MAF] Guardrails: {input.ActiveParticipant} max loops ({MaxLoops}) reached - will escalate");
             input.ShouldEscalate = true;
             return new ValueTask<RunContext>(input);
         }
 
-        Console.WriteLine($"[MAF] Guardrails: All checks passed. Loop {currentLoop}/{MaxLoops}, Author={issueAuthor}");
+        Console.WriteLine($"[MAF] Guardrails: All checks passed for {input.ActiveParticipant}. Loop {currentLoop}/{MaxLoops}");
         return new ValueTask<RunContext>(input);
     }
 }

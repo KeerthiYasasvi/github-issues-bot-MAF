@@ -48,8 +48,15 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
         // Embed state in hidden HTML comment for persistence across invocations
         if (input.State != null)
         {
+            // Update state before embedding
+            input.State.LastUpdated = DateTime.UtcNow;
+            
             body = _stateTool.EmbedState(body, input.State);
-            Console.WriteLine($"[MAF] PostComment: Embedded state (Loop={input.State.LoopCount}, Category={input.State.Category})");
+            
+            // Log active user's loop count
+            var userLoop = input.ActiveUserConversation?.LoopCount ?? 0;
+            var userCount = input.State.UserConversations?.Count ?? 0;
+            Console.WriteLine($"[MAF] PostComment: Embedded state ({input.ActiveParticipant} Loop={userLoop}, {userCount} users, Category={input.State.Category})");
         }
 
         var comment = await _gitHub.PostCommentAsync(owner, repo, issueNumber, body, ct);
@@ -65,12 +72,6 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             if (input.ExecutionState != null)
             {
                 input.ExecutionState.LastUpdate = DateTime.UtcNow;
-            }
-            
-            // Update loop count in state for next invocation
-            if (input.State != null)
-            {
-                input.State.LoopCount = input.CurrentLoopCount ?? 1;
             }
         }
 

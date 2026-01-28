@@ -13,10 +13,19 @@ public class StateStoreTests
         var state = new BotState
         {
             Category = "runtime",
-            LoopCount = 2,
             IssueAuthor = "alice",
-            AskedFields = new List<string> { "error_message", "stack_trace" },
-            LastUpdated = DateTime.UtcNow
+            LastUpdated = DateTime.UtcNow,
+            UserConversations = new Dictionary<string, UserConversation>
+            {
+                ["alice"] = new UserConversation
+                {
+                    Username = "alice",
+                    LoopCount = 2,
+                    AskedFields = new List<string> { "error_message", "stack_trace" },
+                    FirstInteraction = DateTime.UtcNow,
+                    LastInteraction = DateTime.UtcNow
+                }
+            }
         };
 
         var comment = stateStore.EmbedState("hello", state);
@@ -24,9 +33,11 @@ public class StateStoreTests
 
         Assert.NotNull(extracted);
         Assert.Equal(state.Category, extracted!.Category);
-        Assert.Equal(state.LoopCount, extracted.LoopCount);
         Assert.Equal(state.IssueAuthor, extracted.IssueAuthor);
-        Assert.Equal(state.AskedFields.Count, extracted.AskedFields.Count);
+        Assert.Single(extracted.UserConversations);
+        Assert.True(extracted.UserConversations.ContainsKey("alice"));
+        Assert.Equal(2, extracted.UserConversations["alice"].LoopCount);
+        Assert.Equal(2, extracted.UserConversations["alice"].AskedFields.Count);
     }
 
     [Fact]
@@ -38,8 +49,18 @@ public class StateStoreTests
         {
             Category = "build",
             IssueAuthor = "bob",
-            AskedFields = largeFields,
-            LastUpdated = DateTime.UtcNow
+            LastUpdated = DateTime.UtcNow,
+            UserConversations = new Dictionary<string, UserConversation>
+            {
+                ["bob"] = new UserConversation
+                {
+                    Username = "bob",
+                    LoopCount = 1,
+                    AskedFields = largeFields,
+                    FirstInteraction = DateTime.UtcNow,
+                    LastInteraction = DateTime.UtcNow
+                }
+            }
         };
 
         var comment = stateStore.EmbedState("hello", state);
@@ -47,7 +68,7 @@ public class StateStoreTests
 
         var extracted = stateStore.ExtractState(comment);
         Assert.NotNull(extracted);
-        Assert.Equal(largeFields.Count, extracted!.AskedFields.Count);
+        Assert.Equal(largeFields.Count, extracted!.UserConversations["bob"].AskedFields.Count);
     }
 
     [Fact]
