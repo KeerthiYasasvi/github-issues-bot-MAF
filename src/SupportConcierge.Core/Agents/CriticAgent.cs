@@ -267,7 +267,20 @@ public class CriticAgent
             RegexOptions.Singleline
         );
 
-        return jsonMatch.Success ? jsonMatch.Value : cleanJson;
+        if (jsonMatch.Success)
+        {
+            return jsonMatch.Value;
+        }
+
+        // If no JSON object found but we have content, return a valid JSON structure
+        // This handles cases where LLM returns bare string instead of JSON
+        if (!string.IsNullOrWhiteSpace(cleanJson))
+        {
+            // Return a default structure with the content as a suggestion
+            return "{\"score\": 3, \"reasoning\": \"Unable to parse structured critique response\", \"issues\": [], \"suggestions\": [\"Retry critique with proper JSON format\"]}";
+        }
+
+        return cleanJson;
     }
 
     private static void LogCritiqueFailure(string stage, string message, LlmResponse response, Exception? exception)
