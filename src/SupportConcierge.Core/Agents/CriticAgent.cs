@@ -191,12 +191,31 @@ public class CriticAgent
 
             var issues = json.TryGetProperty("issues", out var issuesProperty)
                 ? issuesProperty.EnumerateArray()
-                    .Select(x => new CritiqueIssue
+                    .Select(x =>
                     {
-                        Category = x.GetProperty("category").GetString() ?? "unknown",
-                        Problem = x.GetProperty("problem").GetString() ?? "",
-                        Suggestion = x.GetProperty("suggestion").GetString() ?? "",
-                        Severity = (int)x.GetProperty("severity").GetDecimal()
+                        // Handle both string and object formats
+                        if (x.ValueKind == JsonValueKind.String)
+                        {
+                            // LLM returned issues as array of strings
+                            return new CritiqueIssue
+                            {
+                                Category = "generic",
+                                Problem = x.GetString() ?? "",
+                                Suggestion = "",
+                                Severity = 3
+                            };
+                        }
+                        else
+                        {
+                            // LLM returned issues as array of objects (expected format)
+                            return new CritiqueIssue
+                            {
+                                Category = x.GetProperty("category").GetString() ?? "unknown",
+                                Problem = x.GetProperty("problem").GetString() ?? "",
+                                Suggestion = x.GetProperty("suggestion").GetString() ?? "",
+                                Severity = (int)x.GetProperty("severity").GetDecimal()
+                            };
+                        }
                     })
                     .ToList()
                 : new List<CritiqueIssue>();
