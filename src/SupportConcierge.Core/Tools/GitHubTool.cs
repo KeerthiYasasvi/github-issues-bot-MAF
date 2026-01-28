@@ -54,8 +54,12 @@ public sealed class GitHubTool : IGitHubTool
             return null;
         }
 
+        Console.WriteLine($"[GitHubTool] Attempting to post comment to {owner}/{repo}#{issueNumber}");
+
         // Get the issue's node ID (required for GraphQL)
         var nodeId = await GetIssueNodeIdAsync(owner, repo, issueNumber, cancellationToken);
+        Console.WriteLine($"[GitHubTool] Retrieved node ID: {nodeId}");
+        
         if (string.IsNullOrEmpty(nodeId))
         {
             throw new InvalidOperationException($"Could not retrieve node ID for issue #{issueNumber}");
@@ -83,31 +87,57 @@ public sealed class GitHubTool : IGitHubTool
             }
         };
 
-        var content = new StringContent(JsonSerializer.Serialize(mutation), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync("https://api.github.com/graphql", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        var result = JsonSerializer.Deserialize<JsonElement>(json);
+        Console.WriteLine($"[GitHubTool] Sending GraphQL mutation to https://api.github.com/graphql");
         
-        // Extract comment info from GraphQL response
-        if (result.TryGetProperty("data", out var data) &&
-            data.TryGetProperty("addComment", out var addComment) &&
-            addComment.TryGetProperty("commentEdge", out var commentEdge) &&
-            commentEdge.TryGetProperty("node", out var node))
+        try
         {
-            // For GraphQL responses, we return a minimal GitHubComment
-            // The numeric ID and DateTime are not directly available in GraphQL node format
-            return new GitHubComment
-            {
-                Id = 0, // GraphQL node IDs are different format, but we don't use this field after posting
-                Body = node.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? string.Empty : string.Empty,
-                CreatedAt = DateTime.UtcNow, // Approximate - the exact time is in the response but in ISO 8601 string format
-                User = new GitHubUser { Login = "github-actions[bot]" }
-            };
-        }
+            var content = new StringContent(JsonSerializer.Serialize(mutation), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("https://api.github.com/graphql", content, cancellationToken);
+            
+            Console.WriteLine($"[GitHubTool] GraphQL response status: {response.StatusCode}");
+            
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            Console.WriteLine($"[GitHubTool] GraphQL response body: {json}");
+            
+            response.EnsureSuccessStatusCode();
 
-        return null;
+            var result = JsonSerializer.Deserialize<JsonElement>(json);
+        
+            // Check for GraphQL errors
+            if (result.TryGetProperty("errors", out var errors))
+            {
+                Console.WriteLine($"[GitHubTool] GraphQL errors found: {errors}");
+                throw new InvalidOperationException($"GraphQL mutation failed: {errors}");
+            }
+        
+            // Extract comment info from GraphQL response
+            if (result.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("addComment", out var addComment) &&
+                addComment.TryGetProperty("commentEdge", out var commentEdge) &&
+                commentEdge.TryGetProperty("node", out var node))
+            {
+                Console.WriteLine($"[GitHubTool] Comment posted successfully via GraphQL");
+                
+                // For GraphQL responses, we return a minimal GitHubComment
+                // The numeric ID and DateTime are not directly available in GraphQL node format
+                return new GitHubComment
+                {
+                    Id = 0, // GraphQL node IDs are different format, but we don't use this field after posting
+                    Body = node.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? string.Empty : string.Empty,
+                    CreatedAt = DateTime.UtcNow, // Approximate - the exact time is in the response but in ISO 8601 string format
+                    User = new GitHubUser { Login = "github-actions[bot]" }
+                };
+            }
+
+            Console.WriteLine($"[GitHubTool] Could not parse GraphQL response - missing expected fields");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GitHubTool] Exception during GraphQL posting: {ex.Message}");
+            Console.WriteLine($"[GitHubTool] Exception stack trace: {ex.StackTrace}");
+            throw;
+        }
     }
 
     public async Task AddLabelsAsync(string owner, string repo, int issueNumber, List<string> labels, CancellationToken cancellationToken = default)
