@@ -184,6 +184,8 @@ public class CriticAgent
         try
         {
             // Extract clean JSON from potentially wrapped response
+            // The OpenAI response.Content is already the extracted text from choices[0].message.content
+            // So we just need to clean it up (remove markdown wrappers, etc.)
             var cleanJson = ExtractJsonFromResponse(response.Content);
             var json = JsonSerializer.Deserialize<JsonElement>(cleanJson);
 
@@ -248,10 +250,17 @@ public class CriticAgent
 
     /// <summary>
     /// Extracts clean JSON from potentially wrapped or markdown-formatted response
-    /// Handles cases where LLM returns: ```json\n{...}\n```, extra whitespace, escaping, etc.
+    /// Handles cases where LLM returns: ```json\n{...}\n```, extra whitespace, etc.
+    /// The OpenAI client already extracts choices[0].message.content, so this function
+    /// just needs to clean up any markdown formatting or text wrappers.
     /// </summary>
     private string ExtractJsonFromResponse(string rawContent)
     {
+        if (string.IsNullOrWhiteSpace(rawContent))
+        {
+            return "{\"score\": 3, \"reasoning\": \"Empty response from LLM\", \"issues\": [], \"suggestions\": [\"Retry critique\"], \"is_passable\": false}";
+        }
+
         // Remove markdown code blocks (```json ... ``` or just ``` ... ```)
         var cleanJson = Regex.Replace(
             rawContent,
@@ -261,9 +270,10 @@ public class CriticAgent
         ).Trim();
 
         // Try to extract JSON object if wrapped in other text
+        // This handles cases where LLM adds explanatory text before/after JSON
         var jsonMatch = Regex.Match(
             cleanJson,
-            @"\{(?:[^{}]|(?:\{[^{}]*\}))*\}",
+            @"\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}",
             RegexOptions.Singleline
         );
 
@@ -272,15 +282,25 @@ public class CriticAgent
             return jsonMatch.Value;
         }
 
-        // If no JSON object found but we have content, return a valid JSON structure
-        // This handles cases where LLM returns bare string instead of JSON
-        if (!string.IsNullOrWhiteSpace(cleanJson))
+        // If no JSON object found, try parsing the entire cleaned content
+        // (LLM might have returned pure JSON without wrappers)
+        try
         {
-            // Return a default structure with the content as a suggestion
-            return "{\"score\": 3, \"reasoning\": \"Unable to parse structured critique response\", \"issues\": [], \"suggestions\": [\"Retry critique with proper JSON format\"]}";
+            var testParse = JsonSerializer.Deserialize<JsonElement>(cleanJson);
+            if (testParse.ValueKind == JsonValueKind.Object)
+            {
+                return cleanJson; // It's valid JSON!
+            }
+        }
+        catch
+        {
+            // Not valid JSON, continue to fallback
         }
 
-        return cleanJson;
+        // If we still have content but couldn't parse it, return a valid default structure
+        // Log the unparseable content for debugging
+        Console.WriteLine($"[MAF] Critic: Could not extract JSON from response, using fallback. Content preview: {cleanJson.Substring(0, Math.Min(200, cleanJson.Length))}");
+        return "{\"score\": 3, \"reasoning\": \"Unable to parse structured critique response\", \"issues\": [], \"suggestions\": [\"Retry critique with proper JSON format\"], \"is_passable\": false}";
     }
 
     private static void LogCritiqueFailure(string stage, string message, LlmResponse response, Exception? exception)

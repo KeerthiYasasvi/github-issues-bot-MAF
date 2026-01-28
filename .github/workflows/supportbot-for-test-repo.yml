@@ -3,9 +3,11 @@ name: Support Concierge Bot
 on:
   issues:
     types: [opened, edited]
+  issue_comment:
+    types: [created]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 jobs:
