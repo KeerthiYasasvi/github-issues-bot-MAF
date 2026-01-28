@@ -77,17 +77,20 @@ public static class SupportConciergeWorkflow
         builder.AddEdge(response, orchestratorEvaluate);
 
         // After orchestrator evaluation: decide next action
-        // Decision 1: Ask follow-up questions
+        // CRITICAL: These edges must be mutually exclusive to prevent duplicate comments
+        // The OrchestratorEvaluateExecutor ensures only ONE flag is set at a time
+        
+        // Decision 1: Ask follow-up questions (highest priority, most specific)
         builder.AddEdge<RunContext>(orchestratorEvaluate, postComment, ctx =>
-            (ctx?.ShouldAskFollowUps ?? false) && ((ctx?.CurrentLoopCount ?? 0) < 3));
+            (ctx?.ShouldAskFollowUps ?? false));
 
-        // Decision 2: Finalize (actionable)
+        // Decision 2: Finalize (actionable) - only if NOT asking follow-ups
         builder.AddEdge<RunContext>(orchestratorEvaluate, postComment, ctx =>
-            (ctx?.ShouldFinalize ?? false));
+            (ctx?.ShouldFinalize ?? false) && !(ctx?.ShouldAskFollowUps ?? false));
 
-        // Decision 3: Escalate
+        // Decision 3: Escalate - only if NOT finalizing or asking follow-ups
         builder.AddEdge<RunContext>(orchestratorEvaluate, postComment, ctx =>
-            (ctx?.ShouldEscalate ?? false) || ((ctx?.CurrentLoopCount ?? 0) >= 3));
+            (ctx?.ShouldEscalate ?? false) && !(ctx?.ShouldFinalize ?? false) && !(ctx?.ShouldAskFollowUps ?? false));
 
         // After posting, persist state
         builder.AddEdge(postComment, persistState);

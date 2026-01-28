@@ -54,7 +54,13 @@ public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunConte
         Console.WriteLine($"[MAF] Orchestrator: Decision = {decision.Action} (confidence: {decision.ConfidenceScore:F2})");
         Console.WriteLine($"[MAF] Orchestrator: Reasoning - {decision.Reasoning}");
 
-        // Set flags based on decision
+        // CRITICAL: Clear all decision flags first to ensure only ONE is set
+        // This prevents duplicate comments from multiple workflow edges firing
+        input.ShouldFinalize = false;
+        input.ShouldEscalate = false;
+        input.ShouldAskFollowUps = false;
+
+        // Set flags based on decision (mutually exclusive)
         if (decision.Action == "finalize")
         {
             input.ShouldFinalize = true;
