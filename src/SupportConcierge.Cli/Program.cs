@@ -105,10 +105,8 @@ public static class Program
         Console.WriteLine($"[Metrics] Tokens used: {metricsRecord.TokenUsage.TotalTokens}");
         Console.WriteLine("[MAF] Workflow completed successfully");
 
-        if (decision == "follow_up")
-        {
-            await TryPostFallbackCommentAsync(resultContext, gitHubTool);
-        }
+        // NOTE: Removed fallback comment posting - PostCommentExecutor in workflow handles all commenting
+        // The duplicate comment bug was caused by posting both in workflow AND here
 
         await WriteMetricsAsync(metrics);
 

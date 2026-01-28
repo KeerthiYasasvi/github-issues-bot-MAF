@@ -68,7 +68,6 @@ public static class SupportConciergeWorkflow
 
         // After guardrails: check for /stop or finalized
         builder.AddEdge<RunContext>(guardrails, postComment, ctx => ctx?.ShouldStop ?? false);
-        builder.AddEdge(postComment, persistState);
 
         // Normal flow: Guardrails → Triage → Research → Response → Evaluate
         builder.AddEdge<RunContext>(guardrails, triage, ctx => !(ctx?.ShouldStop ?? false));
