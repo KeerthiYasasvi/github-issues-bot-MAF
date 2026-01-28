@@ -77,11 +77,19 @@ public class StateStoreTests
         var stateStore = new StateStoreTool();
         var state = new BotState
         {
-            AskedFields = Enumerable.Range(0, 30).Select(i => $"field_{i}").ToList()
+            IssueAuthor = "alice",
+            UserConversations = new Dictionary<string, UserConversation>
+            {
+                ["alice"] = new UserConversation
+                {
+                    Username = "alice",
+                    AskedFields = Enumerable.Range(0, 30).Select(i => $"field_{i}").ToList()
+                }
+            }
         };
 
         var pruned = stateStore.PruneState(state, 20);
-        Assert.Equal(20, pruned.AskedFields.Count);
-        Assert.Equal("field_10", pruned.AskedFields.First());
+        Assert.Equal(20, pruned.UserConversations["alice"].AskedFields.Count);
+        Assert.Equal("field_10", pruned.UserConversations["alice"].AskedFields.First());
     }
 }
