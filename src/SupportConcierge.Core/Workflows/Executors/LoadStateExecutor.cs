@@ -80,6 +80,7 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
             if (loadedState != null)
             {
                 input.State = loadedState;
+                input.CurrentLoopCount = loadedState.LoopCount;  // Initialize loop counter from persisted state
                 
                 // Validate that the issue author matches (security check)
                 var issueAuthor = input.Issue?.User?.Login ?? string.Empty;
