@@ -54,12 +54,10 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
                 return input;
             }
 
-            // Get bot username from environment
-            // Check both SUPPORTBOT_USERNAME (preferred) and GITHUB_ACTOR (fallback)
-            var preferredBotUsername = Environment.GetEnvironmentVariable("SUPPORTBOT_USERNAME") ?? "github-actions[bot]";
-            var actualBotUsername = Environment.GetEnvironmentVariable("GITHUB_ACTOR") ?? preferredBotUsername;
+            // Get bot username from environment variable
+            var botUsername = Environment.GetEnvironmentVariable("SUPPORTBOT_USERNAME") ?? "github-actions[bot]";
             
-            Console.WriteLine($"[MAF] LoadState: Looking for bot comments from: preferred={preferredBotUsername}, actual={actualBotUsername}");
+            Console.WriteLine($"[MAF] LoadState: Looking for bot comments from: {botUsername}");
 
             // Find the latest bot comment with state
             BotState? loadedState = null;
@@ -74,8 +72,8 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
                     continue;  // No embedded state, skip
                 }
                 
-                // Check if this is a bot comment (check both preferred and actual bot usernames)
-                var isBotComment = commentAuthor == preferredBotUsername || commentAuthor == actualBotUsername;
+                // Check if this is a bot comment
+                var isBotComment = commentAuthor == botUsername;
                 
                 if (isBotComment)
                 {
