@@ -71,6 +71,11 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             {
                 Console.WriteLine($"[MAF] PostComment:   - User '{kvp.Key}': LoopCount={kvp.Value.LoopCount}, IsExhausted={kvp.Value.IsExhausted}, IsFinalized={kvp.Value.IsFinalized}");
             }
+            
+            // DEBUG: Show last 300 chars of body to verify state marker is present
+            var bodyEnd = body.Length > 300 ? body.Substring(body.Length - 300) : body;
+            Console.WriteLine($"[MAF] PostComment: DEBUG - Last 300 chars of body to post:");
+            Console.WriteLine(bodyEnd);
         }
 
         var comment = await _gitHub.PostCommentAsync(owner, repo, issueNumber, body, ct);

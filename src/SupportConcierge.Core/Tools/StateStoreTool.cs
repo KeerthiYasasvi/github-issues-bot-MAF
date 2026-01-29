@@ -8,8 +8,8 @@ namespace SupportConcierge.Core.Tools;
 
 public sealed class StateStoreTool
 {
-    private const string StateMarkerPrefix = "<!-- supportbot_state:";
-    private const string StateMarkerSuffix = " -->";
+    private const string StateMarkerPrefix = "```supportbot-state\n";
+    private const string StateMarkerSuffix = "\n```";
     private const int CompressionThresholdBytes = 2000;
 
     public BotState? ExtractState(string commentBody)
@@ -23,7 +23,7 @@ public sealed class StateStoreTool
         var pattern = Regex.Escape(StateMarkerPrefix) + @"(.+?)" + Regex.Escape(StateMarkerSuffix);
         var matches = Regex.Matches(commentBody, pattern, RegexOptions.Singleline);
         
-        Console.WriteLine($"[StateStore] ExtractState: Searching for pattern: {StateMarkerPrefix}...{StateMarkerSuffix}");
+        Console.WriteLine($"[StateStore] ExtractState: Searching for code fence pattern: supportbot-state");
         Console.WriteLine($"[StateStore] ExtractState: Found {matches.Count} matches");
         
         if (matches.Count == 0)
