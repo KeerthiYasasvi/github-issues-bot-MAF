@@ -36,9 +36,10 @@ public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunConte
         // Track per-user loop count
         if (input.ActiveUserConversation != null)
         {
+            var beforeIncrement = input.ActiveUserConversation.LoopCount;
             input.ActiveUserConversation.LoopCount++;
             input.CurrentLoopCount = input.ActiveUserConversation.LoopCount;
-            Console.WriteLine($"[MAF] Orchestrator: {input.ActiveParticipant} Loop {input.CurrentLoopCount}/3");
+            Console.WriteLine($"[MAF] Orchestrator: {input.ActiveParticipant} Loop BEFORE increment={beforeIncrement}, AFTER increment={input.CurrentLoopCount} (will display as 'Loop {input.CurrentLoopCount} of 3')");
         }
         else
         {

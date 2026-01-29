@@ -22,7 +22,7 @@
 
 **Repository Structure:**
 - **Bot Repository**: `github-issues-bot-MAF` - Contains the bot source code
-- **Test Repository**: `yt-music-ELT-pipeline` - Real-world test bed for bot interactions
+- **Test Repository**: `ytm-stream-analytics` - Real-world test bed for bot interactions
 
 **Technology Stack:**
 - .NET 8.0 (C#)
@@ -456,7 +456,7 @@ Github-issues-bot-with-MAF/
 
 ## 🧪 Test Repository Setup
 
-### Test Repository: `yt-music-ELT-pipeline`
+### Test Repository: `ytm-stream-analytics`
 
 **Purpose**: Real-world test environment for bot interactions
 
@@ -825,38 +825,33 @@ if (loadedState.UserConversations == null && loadedState.LoopCount > 0)
 
 ## ⚠️ Known Issues
 
-### 1. Critique Scoring Bug 🔴 HIGH PRIORITY
-**Problem**: Critic agent returns identical scores (usually 4 or 5) for every agent output, every run.
+### 1. Critique Scoring Bug 🔴 CRITICAL PRIORITY
+**Problem**: Critic agent returns **identical scores for every agent in every run**, exhibiting completely deterministic behavior.
 
-**Evidence**:
+**Specific Observed Scores**:
 ```json
-// Run 12:
-"TriageScore": 5,
-"ResearchScore": 4,
-"ResponseScore": 5
-
-// Run 34:
-"TriageScore": 5,
-"ResearchScore": 4,
-"ResponseScore": 5
-
-// Run 86:
-"TriageScore": 5,
-"ResearchScore": 4,
-"ResponseScore": 5
+// EVERY RUN (12, 34, 86, etc.):
+"TriageScore": 5,      // Always 5
+"ResearchScore": 2,    // Always 2
+"ResponseScore": 2     // Always 2
 ```
 
 **Impact**:
-- Fallback mechanisms never trigger (always "high quality")
-- No signal for when agents produce poor outputs
-- Metrics useless for evaluation
+- Fallback mechanisms never trigger (triage always "excellent", research/response always "poor")
+- No signal for actual output quality variations
+- Metrics completely useless for evaluation
+- Agent improvements can't be measured
+- System appears to have learned a fixed scoring pattern
 
-**Hypothesis**:
-1. **Prompt Too Lenient**: Critic prompt may not emphasize critical evaluation
-2. **No Negative Examples**: Critic never sees examples of bad outputs (score 1-2)
-3. **LLM Temperature**: May be too low (deterministic) or too high (random)
-4. **Schema Enforcement Issue**: JSON schema forces score 3-5 range?
-5. **Input Contamination**: Critic sees same input every time, learns pattern
+**Root Cause Hypothesis**:
+1. **Deterministic Prompt**: Critic prompt likely produces identical reasoning every time
+2. **No Context Variation**: Critic sees similar inputs every run, memorizes pattern
+3. **Temperature Too Low**: LLM temperature may be 0 (fully deterministic)
+4. **Prompt Structure**: May explicitly or implicitly bias toward these exact scores
+5. **Schema Constraint**: Possibly forcing certain score ranges per agent type
+
+**Why This Matters**:
+The scoring is not just "similar" - it's **byte-for-byte identical** across all runs, suggesting the critic is not actually evaluating quality but following a fixed template response. This means the entire critique system is non-functional.
 
 **Debug Steps**:
 - [ ] Add logging of full critic prompt + response
@@ -865,23 +860,63 @@ if (loadedState.UserConversations == null && loadedState.LoopCount > 0)
 - [ ] Test critic with known bad inputs (empty, nonsensical)
 - [ ] Check if critic reasoning is actually different (not just scores)
 
-### 2. Agent Reasoning Not Logged 🟡 MEDIUM PRIORITY
-**Problem**: Workflow logs don't show agent reasoning, tool usage, or decision-making process.
+### 2. Agent Reasoning Not Logged � HIGH PRIORITY
+**Problem**: Workflow logs don't show **any agent reasoning, tool usage, or decision-making process** for any of the 5 agents.
+
+**Missing Visibility**:
+- **Triage Agent**: Why it classified as bug/feature, why actionable/not actionable
+- **Research Agent**: Which tools selected, search queries used, why those tools
+- **Response Agent**: Why these specific questions, what information gaps identified
+- **Critic Agent**: Full reasoning for scores (though scores are broken - see bug #1)
+- **Orchestrator Agent**: Decision logic (finalize vs ask follow-ups vs escalate)
 
 **Impact**:
-- Hard to debug why bot asked certain questions
-- Can't understand research agent's tool selection
+- Impossible to debug why bot asked certain questions (see Issue #16 - nonsensical questions)
+- Can't understand research agent's tool selection rationale
 - No visibility into orchestrator's decision logic
 - Can't audit triage classification reasoning
+- Can't determine if agents are hallucinating or making logical decisions
+- Cannot validate if multi-agent system is actually working as designed
 
-**Desired Logs**:
+**Desired Logs** (Human-Readable Format):
 ```
-[Triage] Reasoning: Issue mentions "429 error" + "rate limit" → Category: bug
-[Triage] Actionability: 3/5 - Missing: retry logic details, request volume
-[Research] Tools selected: SearchWeb (rate limit docs), SearchIssues (429 errors)
-[Research] Found: 3 related issues, 2 doc pages
-[Response] Asking about: retry logic (not asked before), request patterns (new)
-[Orchestrator] Decision: Not actionable (missing 2 fields) → Ask follow-ups
+[Triage] Classification:
+  Category: bug
+  Severity: high
+  Actionability: 3/5
+  Reasoning: Issue mentions "429 error" + "rate limit" + "Azure Functions" → Rate limiting bug
+  Missing Info: retry logic implementation details, exact request volume/patterns
+
+[Research] Tool Selection:
+  Selected Tools: SearchWeb, SearchIssues
+  SearchWeb Query: "Azure Functions rate limiting 429 error"
+  SearchIssues Query: "label:bug 429 rate limit"
+  Reasoning: Need external docs on Azure rate limits + check if similar issues exist
+  
+[Research] Findings:
+  - Found 3 related issues (#8, #12, #14)
+  - Found 2 doc pages: Azure Functions limits, API best practices
+  - Key insight: Azure outbound IP may be shared, causing aggregate rate limiting
+
+[Response] Question Generation:
+  Question 1: "What retry logic do you have?" (Not asked before, critical for diagnosis)
+  Question 2: "How many requests per minute?" (New, helps quantify volume)
+  Question 3: "Using shared or dedicated App Service Plan?" (New, Azure-specific)
+  Reasoning: Need retry implementation to assess if exponential backoff is correct
+            Need request volume to validate if hitting documented limits
+            Need plan type because shared IPs have aggregate limits
+
+[Critic] Evaluation:
+  Triage Score: 5/5 - Clear categorization, identified key missing info
+  Research Score: 2/5 - Found issues but didn't extract actionable insights from them
+  Response Score: 2/5 - Questions too generic, didn't reference research findings
+  Reasoning: [Full reasoning text from critic prompt response]
+
+[Orchestrator] Decision:
+  Input State: Loop 1, not actionable, 3 questions generated
+  Decision: Ask follow-ups (ShouldAskFollowUps = true)
+  Reasoning: Issue not actionable yet, have targeted questions, under loop limit
+  Next Action: Post questions, increment loop counter, wait for user response
 ```
 
 **Implementation**:
@@ -890,7 +925,103 @@ if (loadedState.UserConversations == null && loadedState.LoopCount > 0)
 - [ ] Show which fields are missing for actionability
 - [ ] Display tool execution results (not just "research complete")
 
-### 3. Comment Parsing Edge Cases 🟡 MEDIUM PRIORITY
+### 3. Loop Counter Not Incrementing 🔴 CRITICAL PRIORITY
+**Problem**: Loop counter **does not increment** between bot interactions. Bot always shows "Loop 1 of 3" even after multiple follow-up rounds.
+
+**Evidence** (Issue #16):
+```
+Comment 1 (Bot): "Loop 1 of 3" + questions
+Comment 2 (User): Answers
+Comment 3 (Bot): "Loop 1 of 3" + more questions  ← WRONG, should be Loop 2
+Comment 4 (User): More answers  
+Comment 5 (Bot): "Loop 1 of 3" + more questions  ← WRONG, should be Loop 3
+```
+
+**Impact**:
+- Bot never escalates (thinks it's always on loop 1)
+- Users answer same questions repeatedly
+- No convergence toward finalization
+- Max loop limit (3) never enforced
+- Bot appears broken to users
+
+**Root Cause Hypothesis**:
+1. **Loop Counter Not Saved**: `UserConversation.LoopCount` incremented but not persisted in state
+2. **State Not Loaded**: Loop counter resets because state extraction fails
+3. **Wrong Property Used**: Code may be reading/writing different loop counter properties
+4. **Increment Timing**: Counter incremented AFTER state embedding instead of BEFORE
+
+**Where to Debug**:
+- LoadStateExecutor: Check if `ActiveUserConversation.LoopCount` is loaded correctly
+- OrchestratorEvaluateExecutor: Check if loop counter is incremented
+- PostCommentExecutor: Verify state is embedded AFTER counter increment
+- Run logs: Check "Embedded state" message shows correct loop count
+
+**Related**: This may be why Issue #16 shows nonsensical questions - bot forgets context because it thinks every interaction is Loop 1.
+
+### 4. Multi-User Loop Counter Carries Over 🔴 CRITICAL PRIORITY
+**Problem**: When a second user comments, their loop counter **starts at the first user's loop count** instead of 0. Loop counters are not independent per user.
+
+**Evidence** (Issue #16):
+```
+KeerthiYasasvi (issue author):
+  Comment 1 (Bot): "@KeerthiYasasvi Loop 1 of 3"
+  Comment 2 (KeerthiYasasvi): Answers
+  Comment 3 (Bot): "@KeerthiYasasvi Loop 1 of 3" (should be 2, but see bug #3)
+
+yk617 (second user with /diagnose):
+  Comment 4 (yk617): "/diagnose" + question
+  Comment 5 (Bot): "@yk617 Loop 1 of 3"  ← WRONG, why does yk617 start at loop 1?
+                                         ← Should be Loop 1, but only by coincidence
+  
+Actual Expected Flow:
+  yk617 should start at Loop 1 (correct)
+  But if KeerthiYasasvi was at Loop 2, yk617 would start at Loop 2 (broken)
+```
+
+**Impact**:
+- Second user inherits first user's progress
+- Second user may hit loop limit immediately if first user was at Loop 3
+- Multi-user conversations are fundamentally broken
+- Users can't have independent conversations on same issue
+- Bot behavior is unpredictable and user-dependent
+
+**Root Cause Hypothesis**:
+1. **Shared Loop Counter**: Code may use `State.LoopCount` (obsolete) instead of `UserConversations[user].LoopCount`
+2. **Wrong User Key**: When adding new user to `UserConversations`, copies existing user's data
+3. **Initialization Bug**: New `UserConversation` initialized with wrong loop count (copies from state instead of 0)
+4. **Reference vs Copy**: New user gets reference to existing user's object instead of fresh copy
+
+**Where to Debug**:
+- LoadStateExecutor: Check logic when adding new user to `UserConversations`
+- GuardrailsExecutor: Check /diagnose command handling - does it initialize loop to 0?
+- PostCommentExecutor: Check if loop increment applies to correct user's conversation
+- State JSON: Manually inspect embedded state to see if each user has separate loop counts
+
+**Why This is Critical**:
+This bug makes the entire multi-user feature non-functional. Until fixed, the bot cannot support multiple users on the same issue, which was a primary design goal (Phase 2 implementation).
+
+### 5. Nonsensical Questions Generated 🔴 HIGH PRIORITY
+**Problem**: Response agent sometimes generates questions that don't make sense given the context or previous answers (see Issue #16).
+
+**Impact**:
+- Users get confused by irrelevant questions
+- Bot appears to not "listen" to previous answers
+- Wastes user time answering questions that don't help diagnosis
+- Reduces trust in bot's intelligence
+
+**Possible Causes**:
+1. **Context Loss**: Related to bug #3 - if loop counter doesn't increment, bot forgets previous Q&A
+2. **AskedFields Not Checked**: Response agent may not properly check `UserConversation.AskedFields`
+3. **Poor Prompt**: Response agent prompt may not emphasize "avoid redundant questions"
+4. **No Reasoning Logs**: Can't debug without seeing why agent selected those questions (see bug #2)
+
+**Debug Strategy**:
+1. Fix bug #3 (loop counter) first - may resolve this automatically
+2. Add logging for bug #2 (agent reasoning) - see why questions selected
+3. Review Response agent prompt for redundancy prevention
+4. Check if `AskedFields` is properly populated and queried
+
+### 6. Comment Parsing Edge Cases 🟡 MEDIUM PRIORITY
 **Problem**: Current command detection is simple regex, may miss edge cases.
 
 **Edge Cases**:
@@ -907,7 +1038,7 @@ if (loadedState.UserConversations == null && loadedState.LoopCount > 0)
 - [ ] Priority order if multiple commands: /stop > /diagnose
 - [ ] Fuzzy matching with Levenshtein distance ≤ 2
 
-### 4. State Size Growth 🟢 LOW PRIORITY
+### 7. State Size Growth 🟢 LOW PRIORITY
 **Problem**: As more users join, `UserConversations` grows. With compression, this is mitigated but not eliminated.
 
 **Current Limits**:
@@ -924,7 +1055,7 @@ if (loadedState.UserConversations == null && loadedState.LoopCount > 0)
 - [ ] Limit `SharedFindings` to 10 most recent
 - [ ] Move large state to GitHub Gists (link in comment)
 
-### 5. Loop Exhaustion Messaging 🟢 LOW PRIORITY
+### 8. Loop Exhaustion Messaging 🟢 LOW PRIORITY
 **Problem**: When user reaches loop 3, bot says "I'll escalate to maintainer" but doesn't actually tag anyone.
 
 **Current Behavior**:
@@ -942,9 +1073,28 @@ Loop 3 of 3. I'll escalate to maintainer after 3 attempts if issue remains uncle
 
 ## 🚀 Future Enhancements
 
+### Critical Bug Fixes (Must Fix First)
+
+#### 1. Fix Loop Counter Not Incrementing (Bug #3)
+- **Goal**: Make loop counter actually increment between interactions
+- **Approach**:
+  - Add debug logging to show loop count before/after increment
+  - Verify `OrchestratorEvaluateExecutor` increments `ActiveUserConversation.LoopCount`
+  - Ensure increment happens BEFORE `PostCommentExecutor` embeds state
+  - Check that state embedding captures the incremented value
+  - Test with Issue #16 to verify "Loop 1 → Loop 2 → Loop 3" progression
+
+#### 2. Fix Multi-User Loop Counter Carryover (Bug #4)
+- **Goal**: Each user starts at Loop 1, independent counters
+- **Approach**:
+  - Debug `LoadStateExecutor` - when adding new user to `UserConversations`, ensure loop starts at 1
+  - Check if using `State.LoopCount` (obsolete) instead of per-user loop count
+  - Verify `/diagnose` command creates new `UserConversation` with `LoopCount = 1`
+  - Test with Issue #16: KeerthiYasasvi at Loop 2, yk617 uses `/diagnose` → yk617 should be Loop 1
+
 ### High Priority
 
-#### 1. Fix Critique Scoring System
+#### 3. Fix Critique Scoring System (Bug #1)
 - **Goal**: Make critic scores meaningful and variable
 - **Approach**: 
   - Add negative examples to critic prompt (bad classifications, irrelevant questions)
@@ -1031,13 +1181,20 @@ Loop 3 of 3. I'll escalate to maintainer after 3 attempts if issue remains uncle
   - Review and edit briefs before maintainer sees them
   - Analytics dashboard (avg loops, actionability rate, top categories)
 
-#### 11. Advanced Guardrails
-- **Goal**: Prevent abuse and misuse
+#### 11. Advanced Guardrails & Security
+- **Goal**: Prevent abuse, misuse, and security vulnerabilities
 - **Features**:
-  - Rate limiting (max 5 comments per user per hour)
-  - Spam detection (repeated messages, gibberish)
-  - Profanity filter (reject toxic comments)
-  - Auto-lock issues after 10 bot interactions (human review needed)
+  - **Prompt Injection Defense**: Detect and block attempts to manipulate agent prompts
+    - Input sanitization (remove markdown injection, code fence escaping)
+    - System prompt isolation (user input never mixed with system instructions)
+    - Jailbreak pattern detection ("ignore previous instructions", "you are now...", etc.)
+    - Content validation before LLM calls (check for adversarial patterns)
+  - **Rate Limiting**: Max 5 comments per user per hour, max 20 bot interactions per issue
+  - **Spam Detection**: Repeated messages, gibberish, excessive length
+  - **Profanity Filter**: Reject toxic/abusive comments (return silent ignore)
+  - **Auto-Lock Issues**: After 10 bot interactions → require human review before continuation
+  - **PII Detection**: Enhanced secret redaction (SSN, credit cards, API keys, passwords)
+  - **Malicious Link Blocking**: Prevent phishing links in issue bodies/comments
 
 #### 12. Integration Ecosystem
 - **Goal**: Connect with other tools

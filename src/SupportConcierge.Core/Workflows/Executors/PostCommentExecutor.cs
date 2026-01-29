@@ -60,10 +60,17 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             
             body = _stateTool.EmbedState(body, input.State);
             
-            // Log active user's loop count
+            // Log active user's loop count with detailed user state
             var userLoop = input.ActiveUserConversation?.LoopCount ?? 0;
             var userCount = input.State.UserConversations?.Count ?? 0;
-            Console.WriteLine($"[MAF] PostComment: Embedded state ({input.ActiveParticipant} Loop={userLoop}, {userCount} users, Category={input.State.Category})");
+            Console.WriteLine($"[MAF] PostComment: Embedding state for {input.ActiveParticipant}");
+            Console.WriteLine($"[MAF] PostComment:   - Active user LoopCount={userLoop}");
+            Console.WriteLine($"[MAF] PostComment:   - Total users in state={userCount}");
+            Console.WriteLine($"[MAF] PostComment:   - Category={input.State.Category}");
+            foreach (var kvp in input.State.UserConversations)
+            {
+                Console.WriteLine($"[MAF] PostComment:   - User '{kvp.Key}': LoopCount={kvp.Value.LoopCount}, IsExhausted={kvp.Value.IsExhausted}, IsFinalized={kvp.Value.IsFinalized}");
+            }
         }
 
         var comment = await _gitHub.PostCommentAsync(owner, repo, issueNumber, body, ct);

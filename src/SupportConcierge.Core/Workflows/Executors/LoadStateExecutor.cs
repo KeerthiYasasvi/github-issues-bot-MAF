@@ -129,6 +129,7 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
                     };
                     loadedState.UserConversations[activeUser] = newConv;
                     input.ActiveUserConversation = newConv;
+                    Console.WriteLine($"[MAF] LoadState: Created NEW conversation for {activeUser} with LoopCount=0 (will increment to 1)");
                 }
                 else
                 {
@@ -148,6 +149,7 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
                                 LastInteraction = DateTime.UtcNow
                             };
                             loadedState.UserConversations[activeUser] = userConv;
+                            Console.WriteLine($"[MAF] LoadState: Created NEW conversation for issue author {activeUser} with LoopCount=0 (will increment to 1)");
                         }
                         else
                         {
@@ -158,13 +160,14 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
                     else
                     {
                         userConv.LastInteraction = DateTime.UtcNow;
-                        Console.WriteLine($"[MAF] LoadState: Loaded conversation for {activeUser} - Loop={userConv.LoopCount}, Finalized={userConv.IsFinalized}");
+                        Console.WriteLine($"[MAF] LoadState: LOADED EXISTING conversation for {activeUser} - LoopCount={userConv.LoopCount} (will increment to {userConv.LoopCount+1}), Finalized={userConv.IsFinalized}");
                     }
 
                     input.ActiveUserConversation = userConv;
                 }
 
                 input.CurrentLoopCount = input.ActiveUserConversation?.LoopCount ?? 0;
+                Console.WriteLine($"[MAF] LoadState: Set CurrentLoopCount={input.CurrentLoopCount} for {activeUser} BEFORE increment");
                 
                 // Validate that the issue author matches (security check)
                 var issueAuthor = input.Issue?.User?.Login ?? string.Empty;
