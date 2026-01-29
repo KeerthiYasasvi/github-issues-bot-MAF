@@ -20,6 +20,7 @@ namespace SupportConcierge.Core.Agents;
 /// </summary>
 public class EnhancedResponseAgent
 {
+    private const int MaxLogChars = 2000;
     private readonly ILlmClient _llmClient;
     private readonly SchemaValidator _schemaValidator;
 
@@ -211,6 +212,8 @@ public class EnhancedResponseAgent
 
         if (!response.IsSuccess)
         {
+            Console.WriteLine("[MAF] Response: LLM call failed or schema validation failed.");
+            Console.WriteLine($"[MAF] Response: LLM content (truncated): {TruncateForLog(response.Content)}");
             return defaultResult;
         }
 
@@ -246,8 +249,10 @@ public class EnhancedResponseAgent
                 EscalationNeeded = json.TryGetProperty("escalation_needed", out var escProp) && escProp.GetBoolean()
             };
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[MAF] Response: Failed to parse LLM JSON response: {ex.Message}");
+            Console.WriteLine($"[MAF] Response: LLM content (truncated): {TruncateForLog(response.Content)}");
             return defaultResult;
         }
     }
@@ -263,6 +268,8 @@ public class EnhancedResponseAgent
 
         if (!response.IsSuccess)
         {
+            Console.WriteLine("[MAF] FollowUp: LLM call failed or schema validation failed.");
+            Console.WriteLine($"[MAF] FollowUp: LLM content (truncated): {TruncateForLog(response.Content)}");
             return defaultResult;
         }
 
@@ -300,10 +307,24 @@ public class EnhancedResponseAgent
                 AdditionalContextRequest = context
             };
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[MAF] FollowUp: Failed to parse LLM JSON response: {ex.Message}");
+            Console.WriteLine($"[MAF] FollowUp: LLM content (truncated): {TruncateForLog(response.Content)}");
             return defaultResult;
         }
+    }
+
+    private static string TruncateForLog(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "<empty>";
+        }
+
+        return value.Length <= MaxLogChars
+            ? value
+            : value.Substring(0, MaxLogChars) + "...(truncated)";
     }
 }
 
