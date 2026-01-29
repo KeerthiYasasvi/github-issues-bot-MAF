@@ -8,8 +8,10 @@ namespace SupportConcierge.Core.Tools;
 
 public sealed class StateStoreTool
 {
-    private const string StateMarkerPrefix = "```supportbot-state\n";
-    private const string StateMarkerSuffix = "\n```";
+    private const string CodeFenceMarkerPrefix = "```supportbot-state\n";
+    private const string CodeFenceMarkerSuffix = "\n```";
+    private const string HtmlMarkerPrefix = "<!-- supportbot-state\n";
+    private const string HtmlMarkerSuffix = "\n-->";
     private const int CompressionThresholdBytes = 2000;
 
     public BotState? ExtractState(string commentBody)
@@ -20,28 +22,43 @@ public sealed class StateStoreTool
             return null;
         }
 
-        var pattern = Regex.Escape(StateMarkerPrefix) + @"(.+?)" + Regex.Escape(StateMarkerSuffix);
-        var matches = Regex.Matches(commentBody, pattern, RegexOptions.Singleline);
+        var codeFencePattern = Regex.Escape(CodeFenceMarkerPrefix) + @"(.+?)" + Regex.Escape(CodeFenceMarkerSuffix);
+        var matches = Regex.Matches(commentBody, codeFencePattern, RegexOptions.Singleline);
         
         Console.WriteLine($"[StateStore] ExtractState: Searching for code fence pattern: supportbot-state");
         Console.WriteLine($"[StateStore] ExtractState: Found {matches.Count} matches");
         
-        if (matches.Count == 0)
+        var data = string.Empty;
+        if (matches.Count > 0)
         {
-            // Check if there's ANY HTML comment in the body
-            var anyHtmlComment = Regex.IsMatch(commentBody, @"<!--.+?-->", RegexOptions.Singleline);
-            Console.WriteLine($"[StateStore] ExtractState: Contains HTML comments: {anyHtmlComment}");
-            
-            // Show last 200 chars of comment body to see if state marker is present
-            var bodyEnd = commentBody.Length > 200 ? commentBody.Substring(commentBody.Length - 200) : commentBody;
-            Console.WriteLine($"[StateStore] ExtractState: End of comment body: {bodyEnd}");
-            
-            return null;
+            data = matches[^1].Groups[1].Value.Trim();
+        }
+        else
+        {
+            var htmlPattern = @"<!--\s*supportbot-state\s*[:\n]?(?<data>.+?)-->";
+            var htmlMatches = Regex.Matches(commentBody, htmlPattern, RegexOptions.Singleline);
+            Console.WriteLine($"[StateStore] ExtractState: Searching for HTML comment pattern: supportbot-state");
+            Console.WriteLine($"[StateStore] ExtractState: Found {htmlMatches.Count} matches");
+            if (htmlMatches.Count > 0)
+            {
+                data = htmlMatches[^1].Groups["data"].Value.Trim();
+            }
+            else
+            {
+                // Check if there's ANY HTML comment in the body
+                var anyHtmlComment = Regex.IsMatch(commentBody, @"<!--.+?-->", RegexOptions.Singleline);
+                Console.WriteLine($"[StateStore] ExtractState: Contains HTML comments: {anyHtmlComment}");
+                
+                // Show last 200 chars of comment body to see if state marker is present
+                var bodyEnd = commentBody.Length > 200 ? commentBody.Substring(commentBody.Length - 200) : commentBody;
+                Console.WriteLine($"[StateStore] ExtractState: End of comment body: {bodyEnd}");
+                
+                return null;
+            }
         }
 
         try
         {
-            var data = matches[^1].Groups[1].Value.Trim();
             Console.WriteLine($"[StateStore] ExtractState: Extracted data length: {data.Length} chars");
             
             if (data.StartsWith("compressed:", StringComparison.OrdinalIgnoreCase))
@@ -69,8 +86,8 @@ public sealed class StateStoreTool
         var size = Encoding.UTF8.GetByteCount(json);
 
         var stateComment = size > CompressionThresholdBytes
-            ? $"{StateMarkerPrefix}compressed:{CompressString(json)}{StateMarkerSuffix}"
-            : $"{StateMarkerPrefix}{json}{StateMarkerSuffix}";
+            ? $"{HtmlMarkerPrefix}compressed:{CompressString(json)}{HtmlMarkerSuffix}"
+            : $"{HtmlMarkerPrefix}{json}{HtmlMarkerSuffix}";
 
         var cleanedBody = RemoveState(commentBody);
         return $"{cleanedBody}\n\n{stateComment}";
@@ -83,8 +100,11 @@ public sealed class StateStoreTool
             return commentBody;
         }
 
-        var pattern = Regex.Escape(StateMarkerPrefix) + @".+?" + Regex.Escape(StateMarkerSuffix);
-        return Regex.Replace(commentBody, pattern, string.Empty, RegexOptions.Singleline).Trim();
+        var codeFencePattern = Regex.Escape(CodeFenceMarkerPrefix) + @".+?" + Regex.Escape(CodeFenceMarkerSuffix);
+        var withoutCodeFence = Regex.Replace(commentBody, codeFencePattern, string.Empty, RegexOptions.Singleline);
+        var htmlPattern = @"<!--\s*supportbot-state\s*[:\n]?.+?-->";
+        var withoutHtml = Regex.Replace(withoutCodeFence, htmlPattern, string.Empty, RegexOptions.Singleline);
+        return withoutHtml.Trim();
     }
 
     public BotState CreateInitialState(string category, string issueAuthor)
