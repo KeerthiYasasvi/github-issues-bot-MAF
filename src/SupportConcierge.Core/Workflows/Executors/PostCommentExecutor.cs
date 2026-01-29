@@ -142,9 +142,51 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
 
             if (questions.Count == 0)
             {
-                questions.Add("Please share the exact error message and any relevant logs or stack traces.");
-                questions.Add("What OS and versions are you using (runtime/build tool)?");
-                questions.Add("What steps lead to the failure?");
+                // Category-aware fallback questions based on triage classification
+                var category = input.CategoryDecision?.Category?.ToLower() ?? "unknown";
+                
+                if (category.Contains("documentation"))
+                {
+                    questions.Add("Which documentation file or section needs to be updated?");
+                    questions.Add("What is currently incorrect or missing in the documentation?");
+                    questions.Add("What should the documentation say instead?");
+                }
+                else if (category.Contains("feature"))
+                {
+                    questions.Add("What problem would this feature solve for you?");
+                    questions.Add("How do you envision this feature working?");
+                    questions.Add("Have you considered any alternative approaches?");
+                }
+                else if (category.Contains("configuration") || category.Contains("config"))
+                {
+                    questions.Add("Which configuration file or setting are you trying to modify?");
+                    questions.Add("What configuration have you tried so far?");
+                    questions.Add("What behavior do you expect vs. what actually happens?");
+                }
+                else if (category.Contains("build"))
+                {
+                    questions.Add("What build tool and version are you using?");
+                    questions.Add("Please share the build output and any error messages.");
+                    questions.Add("Have you verified all build dependencies are installed?");
+                }
+                else if (category.Contains("dependency"))
+                {
+                    questions.Add("Which package manager are you using (npm, pip, maven, etc.)?");
+                    questions.Add("Please share your dependency lock file (package-lock.json, requirements.txt, etc.).");
+                    questions.Add("Which packages are conflicting?");
+                }
+                else if (category.Contains("environment"))
+                {
+                    questions.Add("Which setup step is failing?");
+                    questions.Add("What operating system and prerequisites do you have installed?");
+                    questions.Add("Please share any setup logs or error output.");
+                }
+                else // runtime_error, bug_report, or unknown
+                {
+                    questions.Add("Please share the exact error message and any relevant logs or stack traces.");
+                    questions.Add("What OS and versions are you using (runtime/build tool)?");
+                    questions.Add("What steps lead to the failure?");
+                }
             }
 
             for (var i = 0; i < questions.Count && i < 3; i++)
