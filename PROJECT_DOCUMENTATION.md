@@ -1021,7 +1021,52 @@ This bug makes the entire multi-user feature non-functional. Until fixed, the bo
 3. Review Response agent prompt for redundancy prevention
 4. Check if `AskedFields` is properly populated and queried
 
-### 6. Comment Parsing Edge Cases 🟡 MEDIUM PRIORITY
+### 6. Response Agent Ignores Triage Classification ✅ FIXED (Commit 5b0ce74)
+**Problem**: Response agent generated **generic technical debugging questions** (error logs, OS, runtime) for ALL issue types, including documentation issues and feature requests. This made the bot appear "dumb" and frustrated users.
+
+**Evidence** (Issue #16):
+```
+Issue: "README clone instructions point to a different repo/directory (ytm-stream-analytics)"
+Triage: Correctly classified as "documentation_issue"
+Questions Generated:
+  1. "Please share the exact error message and any relevant logs or stack traces."
+  2. "What OS and versions are you using (runtime/build tool)?"
+  3. "What steps lead to the failure?"
+
+User Response: "This is more of a README consistency issue than a runtime failure..."
+Bot Comment 2: Asked IDENTICAL questions again (completely ignored correction)
+yk617 uses /diagnose: Restates it's a documentation issue
+Bot Comment 3: Asked SAME technical questions to yk617
+```
+
+**Impact**:
+- Bot fundamentally broken for ~50% of issues (documentation, feature requests, configuration)
+- Users waste time answering irrelevant questions
+- Bot appears to not "listen" or understand basic issue types
+- Makes triage agent's classification work completely useless
+- Reduces user trust in bot's intelligence
+
+**Root Cause**:
+The `response-followup.md` prompt template was too generic. It mentioned `{CATEGORIES}` in the prompt but didn't provide **category-specific guidance** for question generation. The LLM defaulted to technical debugging questions (most common pattern in training data).
+
+**Fix (Commit 5b0ce74)**:
+Enhanced [prompts/maf-templates/response-followup.md](prompts/maf-templates/response-followup.md) with explicit category-specific guidelines:
+- **documentation_issue** → Ask about files, content, what should change (NEVER error logs)
+- **feature_request** → Ask about use case, design, alternatives (NEVER debugging steps)
+- **runtime_error/bug_report** → Ask about errors, environment, reproduction steps
+- **build_issue** → Ask about build tools, configuration, output
+- **configuration_error** → Ask about config files, settings, expected behavior
+- **dependency_conflict** → Ask about package manager, lock files, conflicts
+- **environment_setup** → Ask about setup steps, prerequisites, setup logs
+
+Added critical instruction: "**Match the category - documentation issues should NOT get debugging questions!**"
+
+**Validation**:
+- Issue #16 should now get: "Which file needs updating?" "What's incorrect?" "What should it say?"
+- Technical issues still get: "What error message?" "What environment?" "How to reproduce?"
+- Feature requests get: "What problem does this solve?" "How should it work?" "Alternatives?"
+
+### 7. Comment Parsing Edge Cases 🟡 MEDIUM PRIORITY
 **Problem**: Current command detection is simple regex, may miss edge cases.
 
 **Edge Cases**:
@@ -1055,7 +1100,7 @@ This bug makes the entire multi-user feature non-functional. Until fixed, the bo
 - [ ] Limit `SharedFindings` to 10 most recent
 - [ ] Move large state to GitHub Gists (link in comment)
 
-### 8. Loop Exhaustion Messaging 🟢 LOW PRIORITY
+### 9. Loop Exhaustion Messaging 🟢 LOW PRIORITY
 **Problem**: When user reaches loop 3, bot says "I'll escalate to maintainer" but doesn't actually tag anyone.
 
 **Current Behavior**:
