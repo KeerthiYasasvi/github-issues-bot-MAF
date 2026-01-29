@@ -52,9 +52,11 @@ public sealed class GuardrailsExecutor : Executor<RunContext, RunContext>
             input.ActiveParticipant = issueAuthor;
         }
 
-        // Check for command parser
-        var bodyText = (input.Issue?.Body ?? "") + " " + (input.IncomingComment?.Body ?? "");
-        var commandInfo = CommandParser.Parse(bodyText);
+        // Check for commands - CRITICAL: Only parse the incoming comment, NOT issue body or previous comments
+        var commandText = input.EventName == "issue_comment" 
+            ? (input.IncomingComment?.Body ?? "")  // For comments, check only the comment
+            : (input.Issue?.Body ?? "");            // For issue open/edit, check issue body
+        var commandInfo = CommandParser.Parse(commandText);
 
         // Build allow list: issue author + users who have used /diagnose
         var allowedUsers = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { issueAuthor };
