@@ -16,29 +16,49 @@ public sealed class StateStoreTool
     {
         if (string.IsNullOrWhiteSpace(commentBody))
         {
+            Console.WriteLine("[StateStore] ExtractState: Empty comment body");
             return null;
         }
 
         var pattern = Regex.Escape(StateMarkerPrefix) + @"(.+?)" + Regex.Escape(StateMarkerSuffix);
         var matches = Regex.Matches(commentBody, pattern, RegexOptions.Singleline);
+        
+        Console.WriteLine($"[StateStore] ExtractState: Searching for pattern: {StateMarkerPrefix}...{StateMarkerSuffix}");
+        Console.WriteLine($"[StateStore] ExtractState: Found {matches.Count} matches");
+        
         if (matches.Count == 0)
         {
+            // Check if there's ANY HTML comment in the body
+            var anyHtmlComment = Regex.IsMatch(commentBody, @"<!--.+?-->", RegexOptions.Singleline);
+            Console.WriteLine($"[StateStore] ExtractState: Contains HTML comments: {anyHtmlComment}");
+            
+            // Show last 200 chars of comment body to see if state marker is present
+            var bodyEnd = commentBody.Length > 200 ? commentBody.Substring(commentBody.Length - 200) : commentBody;
+            Console.WriteLine($"[StateStore] ExtractState: End of comment body: {bodyEnd}");
+            
             return null;
         }
 
         try
         {
             var data = matches[^1].Groups[1].Value.Trim();
+            Console.WriteLine($"[StateStore] ExtractState: Extracted data length: {data.Length} chars");
+            
             if (data.StartsWith("compressed:", StringComparison.OrdinalIgnoreCase))
             {
+                Console.WriteLine("[StateStore] ExtractState: Data is compressed, decompressing...");
                 var compressed = data.Substring("compressed:".Length);
                 data = DecompressString(compressed);
+                Console.WriteLine($"[StateStore] ExtractState: Decompressed data length: {data.Length} chars");
             }
 
-            return JsonSerializer.Deserialize<BotState>(data);
+            var state = JsonSerializer.Deserialize<BotState>(data);
+            Console.WriteLine($"[StateStore] ExtractState: ✓ Successfully deserialized state - Category={state?.Category}");
+            return state;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[StateStore] ExtractState: ✗ Failed to deserialize: {ex.Message}");
             return null;
         }
     }
