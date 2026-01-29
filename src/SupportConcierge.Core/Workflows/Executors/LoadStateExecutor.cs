@@ -62,6 +62,7 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
             if (comments.Count == 0)
             {
                 Console.WriteLine("[MAF] LoadState: No prior comments; starting fresh");
+                InitializeNewState(input);
                 return input;
             }
 
@@ -192,30 +193,8 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
             else
             {
                 Console.WriteLine("[MAF] LoadState: No embedded state found in comments; starting fresh");
-                
-                // Initialize new state with issue author conversation
-                var issueAuthor = input.Issue?.User?.Login ?? string.Empty;
-                input.ActiveParticipant = issueAuthor;
-                
-                var newState = new BotState
-                {
-                    IssueAuthor = issueAuthor,
-                    LastUpdated = DateTime.UtcNow
-                };
 
-                var authorConv = new UserConversation
-                {
-                    Username = issueAuthor,
-                    LoopCount = 0,
-                    IsExhausted = false,
-                    FirstInteraction = DateTime.UtcNow,
-                    LastInteraction = DateTime.UtcNow
-                };
-                
-                newState.UserConversations[issueAuthor] = authorConv;
-                input.State = newState;
-                input.ActiveUserConversation = authorConv;
-                input.CurrentLoopCount = 0;
+                InitializeNewState(input);
             }
         }
         catch (Exception ex)
@@ -225,6 +204,32 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
         }
 
         return input;
+    }
+
+    private static void InitializeNewState(RunContext input)
+    {
+        var issueAuthor = input.Issue?.User?.Login ?? string.Empty;
+        input.ActiveParticipant = issueAuthor;
+
+        var newState = new BotState
+        {
+            IssueAuthor = issueAuthor,
+            LastUpdated = DateTime.UtcNow
+        };
+
+        var authorConv = new UserConversation
+        {
+            Username = issueAuthor,
+            LoopCount = 0,
+            IsExhausted = false,
+            FirstInteraction = DateTime.UtcNow,
+            LastInteraction = DateTime.UtcNow
+        };
+
+        newState.UserConversations[issueAuthor] = authorConv;
+        input.State = newState;
+        input.ActiveUserConversation = authorConv;
+        input.CurrentLoopCount = 0;
     }
 
     /// <summary>
