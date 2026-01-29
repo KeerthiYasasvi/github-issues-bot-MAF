@@ -102,7 +102,7 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
         if (input.ShouldAskFollowUps)
         {
             // Follow-up questions (formatted like previous project)
-            var loopCount = input.State?.LoopCount ?? input.CurrentLoopCount ?? 1;
+            var loopCount = input.ActiveUserConversation?.LoopCount ?? input.CurrentLoopCount ?? 1;
             var maxLoops = input.ExecutionState?.TotalUserLoops ?? 3;
             
             sb.AppendLine("I need a bit more information to help move this forward:");
