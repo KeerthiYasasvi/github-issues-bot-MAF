@@ -1,5 +1,6 @@
 using Microsoft.Agents.AI.Workflows;
 using SupportConcierge.Core.Models;
+using SupportConcierge.Core.Guardrails;
 
 namespace SupportConcierge.Core.Workflows.Executors;
 
@@ -15,12 +16,19 @@ public sealed class ParseEventExecutor : Executor<EventInput, RunContext>
 
     public override ValueTask<RunContext> HandleAsync(EventInput input, IWorkflowContext context, CancellationToken ct = default)
     {
+        var commandText = input.EventName == "issue_comment"
+            ? (input.Comment?.Body ?? string.Empty)
+            : (input.Issue?.Body ?? string.Empty);
+        var commandInfo = CommandParser.Parse(commandText);
+
         var runContext = new RunContext
         {
             EventName = input.EventName,
             Issue = input.Issue,
             Repository = input.Repository,
             IncomingComment = input.Comment,
+            IsDiagnoseCommand = commandInfo.HasDiagnoseCommand,
+            IsStopCommand = commandInfo.HasStopCommand,
             DryRun = ParseBool(Environment.GetEnvironmentVariable("SUPPORTBOT_DRY_RUN")),
             WriteMode = ParseBool(Environment.GetEnvironmentVariable("SUPPORTBOT_WRITE_MODE"))
         };
