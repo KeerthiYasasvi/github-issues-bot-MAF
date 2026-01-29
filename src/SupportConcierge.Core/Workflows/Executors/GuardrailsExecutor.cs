@@ -58,7 +58,16 @@ public sealed class GuardrailsExecutor : Executor<RunContext, RunContext>
             : (input.Issue?.Body ?? "");            // For issue open/edit, check issue body
         var commandInfo = CommandParser.Parse(commandText);
 
-        // Build allow list: issue author + users who have used /diagnose
+        // Check for /diagnose command FIRST - this allows new users to join
+        if (commandInfo.HasDiagnoseCommand)
+        {
+            input.IsDiagnoseCommand = true;
+            Console.WriteLine($"[MAF] Guardrails: /diagnose command from {input.ActiveParticipant} - user will be added to conversation");
+            // Continue processing - LoadStateExecutor will add to UserConversations
+            // Don't return early, let the flow continue
+        }
+
+        // Build allow list: issue author + users who have used /diagnose (in UserConversations)
         var allowedUsers = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { issueAuthor };
         if (input.State?.UserConversations != null)
         {
@@ -67,25 +76,21 @@ public sealed class GuardrailsExecutor : Executor<RunContext, RunContext>
                 allowedUsers.Add(username);
             }
         }
-
-        // Handle /diagnose command - adds user to allow list
+        
+        // If user just used /diagnose, they're now allowed (add them immediately)
         if (commandInfo.HasDiagnoseCommand)
         {
-            input.IsDiagnoseCommand = true;
-            Console.WriteLine($"[MAF] Guardrails: /diagnose command from {input.ActiveParticipant} - adding to allow list");
-            
-            // Will be added to UserConversations in LoadStateExecutor
             allowedUsers.Add(input.ActiveParticipant);
         }
 
-        // SECURITY: Author gating - only allowed users can interact
+        // SECURITY: Author gating - only allowed users can interact (unless they just used /diagnose)
         if (input.EventName == "issue_comment" && !allowedUsers.Contains(incomingCommentAuthor))
         {
-            Console.WriteLine($"[MAF] Guardrails: Comment from {incomingCommentAuthor} (not in allow list). Ignoring.");
+            Console.WriteLine($"[MAF] Guardrails: Comment from {incomingCommentAuthor} (not in allow list). Silently ignoring.");
             Console.WriteLine($"[MAF] Guardrails: Allowed users: {string.Join(", ", allowedUsers)}");
-            Console.WriteLine($"[MAF] Guardrails: Hint: User must use /diagnose to join conversation");
+            Console.WriteLine($"[MAF] Guardrails: Hint: User can use /diagnose to join conversation");
             input.ShouldStop = true;
-            input.StopReason = $"User {incomingCommentAuthor} not in allow list. Use /diagnose to join.";
+            input.StopReason = $"User {incomingCommentAuthor} not in allow list";
             return new ValueTask<RunContext>(input);
         }
 

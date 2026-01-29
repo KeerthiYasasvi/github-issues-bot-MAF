@@ -38,6 +38,13 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             return input;
         }
 
+        // SECURITY: Skip posting if user not in allow list (silent ignore)
+        if (input.ShouldStop && input.StopReason != null && input.StopReason.Contains("not in allow list"))
+        {
+            Console.WriteLine($"[MAF] PostComment: Skipping comment - user not in allow list");
+            return input;
+        }
+
         var body = ComposeComment(input);
         if (string.IsNullOrWhiteSpace(body))
         {
@@ -81,22 +88,31 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
     private static string ComposeComment(RunContext input)
     {
         var sb = new StringBuilder();
-        var author = input.Issue?.User?.Login;
+        var activeUser = input.ActiveParticipant ?? input.Issue?.User?.Login;
         
-        // Mention author
-        if (!string.IsNullOrWhiteSpace(author))
+        // Mention the active participant (actual commenter), not always the issue author
+        if (!string.IsNullOrWhiteSpace(activeUser))
         {
-            sb.AppendLine($"@{author}");
+            sb.AppendLine($"@{activeUser}");
             sb.AppendLine();
         }
 
-        if (input.ShouldStop && !string.IsNullOrWhiteSpace(input.StopReason))
+        if (input.ShouldStop && input.IsStopCommand)
         {
-            // Handle /stop command
-            sb.AppendLine($"You've opted out with `/stop`. I won't ask further questions on this issue.");
+            // Handle explicit /stop command from user
+            sb.AppendLine($"You've used `/stop`. I won't ask you any more questions.");
             sb.AppendLine();
-            sb.AppendLine("If you need to restart, comment with `/diagnose`.");
+            sb.AppendLine("Note: Other users can still interact with me by commenting with `/diagnose`.");
+            sb.AppendLine();
+            sb.AppendLine("If you want to restart your conversation, comment with `/diagnose`.");
             return sb.ToString().Trim();
+        }
+        
+        // If ShouldStop but NOT IsStopCommand, it's finalized or other internal reason
+        if (input.ShouldStop)
+        {
+            Console.WriteLine($"[MAF] PostComment: ShouldStop=true but no comment needed (reason: {input.StopReason})");
+            return string.Empty;  // Return empty to skip posting
         }
 
         if (input.ShouldAskFollowUps)
