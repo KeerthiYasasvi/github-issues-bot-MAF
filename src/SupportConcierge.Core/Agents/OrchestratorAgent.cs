@@ -145,8 +145,11 @@ public class OrchestratorAgent
         }
 
         // Check if resolution is achievable with current information
-        var hasEnoughInfo = context.CategoryDecision != null &&
-                            context.CasePacket.Fields.Count > 0;
+        var infoSufficiency = await AssessInformationSufficiencyAsync(context, plan, cancellationToken);
+        var deterministicEnough = (context.Scoring?.IsActionable ?? false) || context.CasePacket.Fields.Count > 0;
+        var hasEnoughInfo = deterministicEnough || infoSufficiency.HasEnoughInfo;
+
+        context.DecisionPath["info_sufficiency"] = hasEnoughInfo ? "true" : "false";
 
         // Evaluate based on loop stage
         return currentLoop switch
@@ -366,6 +369,67 @@ public class OrchestratorAgent
             return currentPlan;
         }
     }
+
+    private async Task<InfoSufficiencyResult> AssessInformationSufficiencyAsync(
+        RunContext context,
+        OrchestratorPlan plan,
+        CancellationToken cancellationToken)
+    {
+        var schema = OrchestrationSchemas.GetInfoSufficiencySchema();
+        var fieldsText = string.Join("\n", context.CasePacket.Fields.Select(kv => $"- {kv.Key}: {kv.Value}"));
+        var missingFields = context.Scoring?.MissingFields?.Count > 0
+            ? string.Join(", ", context.Scoring.MissingFields)
+            : "none";
+
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "orchestrator-sufficiency.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
+                ["CATEGORY"] = context.CategoryDecision?.Category ?? "unknown",
+                ["CASE_PACKET_FIELDS"] = string.IsNullOrWhiteSpace(fieldsText) ? "none" : fieldsText,
+                ["MISSING_FIELDS"] = missingFields,
+                ["PLAN_INFO_NEEDED"] = plan?.InformationNeeded?.Count > 0 ? string.Join(", ", plan.InformationNeeded) : "none"
+            },
+            cancellationToken);
+
+        var request = new LlmRequest
+        {
+            Messages = new List<LlmMessage>
+            {
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
+            },
+            JsonSchema = schema,
+            SchemaName = "InfoSufficiency",
+            Temperature = 0.2
+        };
+
+        var response = await _llmClient.CompleteAsync(request, cancellationToken);
+        if (!response.IsSuccess)
+        {
+            return new InfoSufficiencyResult(false, new List<string>(), "LLM sufficiency check failed");
+        }
+
+        try
+        {
+            var json = JsonSerializer.Deserialize<JsonElement>(response.Content);
+            var hasEnoughInfo = json.GetProperty("has_enough_info").GetBoolean();
+            var missing = json.TryGetProperty("missing_info", out var missingProp)
+                ? missingProp.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
+                : new List<string>();
+            var reasoning = json.GetProperty("reasoning").GetString() ?? string.Empty;
+
+            return new InfoSufficiencyResult(hasEnoughInfo, missing, reasoning);
+        }
+        catch
+        {
+            return new InfoSufficiencyResult(false, new List<string>(), "Failed to parse sufficiency response");
+        }
+    }
+
+    private sealed record InfoSufficiencyResult(bool HasEnoughInfo, List<string> MissingInfo, string Reasoning);
 }
 
 /// <summary>

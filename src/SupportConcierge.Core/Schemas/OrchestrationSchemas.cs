@@ -329,4 +329,37 @@ public static class OrchestrationSchemas
 
         return JsonSerializer.Serialize(schema);
     }
+
+    /// <summary>
+    /// Schema for information sufficiency check
+    /// </summary>
+    public static string GetInfoSufficiencySchema()
+    {
+        var schema = new
+        {
+            type = "object",
+            properties = new
+            {
+                has_enough_info = new
+                {
+                    type = "boolean",
+                    description = "True if there is enough information to provide a helpful response"
+                },
+                missing_info = new
+                {
+                    type = "array",
+                    items = new { type = "string" },
+                    description = "Key missing details needed to respond confidently"
+                },
+                reasoning = new
+                {
+                    type = "string",
+                    description = "Why the information is sufficient or insufficient"
+                }
+            },
+            required = new[] { "has_enough_info", "missing_info", "reasoning" }
+        };
+
+        return JsonSerializer.Serialize(schema);
+    }
 }

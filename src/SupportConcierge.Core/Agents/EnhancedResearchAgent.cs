@@ -43,9 +43,7 @@ public class EnhancedResearchAgent
             "GitHubSearchTool (search issues, pull requests, discussions)",
             "DocumentationSearchTool (search docs, readme, wiki)",
             "CodeAnalysisTool (analyze code patterns, version info)",
-            "ValidationTool (check configuration, environment setup)",
-            "CommentPostTool (analyze existing comments for context)",
-            "LabelApplyTool (check issue labels for categorization hints)"
+            "ValidationTool (check configuration, environment setup)"
         });
 
         var categoriesText = string.Join(", ", triageResult.Categories);

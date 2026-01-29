@@ -37,14 +37,18 @@ public static class SupportConciergeWorkflow
         EnhancedResponseAgent responseAgent,
         CriticAgent criticAgent,
         OrchestratorAgent orchestratorAgent,
+        CasePacketAgent casePacketAgent,
         ToolRegistry toolRegistry,
+        ISpecPackLoader specPackLoader,
         IGitHubTool gitHubTool)
     {
         // Create executors
         var parseEvent = new ParseEventExecutor();
         var loadState = new LoadStateExecutor(gitHubTool);
         var guardrails = new GuardrailsExecutor();
+        var loadSpecPack = new LoadSpecPackExecutor(specPackLoader);
         var triage = new TriageExecutor(triageAgent, criticAgent);
+        var casePacket = new CasePacketExecutor(gitHubTool, casePacketAgent);
         var research = new ResearchExecutor(researchAgent, criticAgent, toolRegistry);
         var response = new ResponseExecutor(responseAgent, criticAgent);
         var orchestratorEvaluate = new OrchestratorEvaluateExecutor(orchestratorAgent);
@@ -55,7 +59,9 @@ public static class SupportConciergeWorkflow
         var builder = new WorkflowBuilder(parseEvent)
             .BindExecutor(loadState)
             .BindExecutor(guardrails)
+            .BindExecutor(loadSpecPack)
             .BindExecutor(triage)
+            .BindExecutor(casePacket)
             .BindExecutor(research)
             .BindExecutor(response)
             .BindExecutor(orchestratorEvaluate)
@@ -70,8 +76,10 @@ public static class SupportConciergeWorkflow
         builder.AddEdge<RunContext>(guardrails, postComment, ctx => ctx?.ShouldStop ?? false);
 
         // Normal flow: Guardrails → Triage → Research → Response → Evaluate
-        builder.AddEdge<RunContext>(guardrails, triage, ctx => !(ctx?.ShouldStop ?? false));
-        builder.AddEdge(triage, research);
+        builder.AddEdge<RunContext>(guardrails, loadSpecPack, ctx => !(ctx?.ShouldStop ?? false));
+        builder.AddEdge(loadSpecPack, triage);
+        builder.AddEdge(triage, casePacket);
+        builder.AddEdge(casePacket, research);
         builder.AddEdge(research, response);
         builder.AddEdge(response, orchestratorEvaluate);
 

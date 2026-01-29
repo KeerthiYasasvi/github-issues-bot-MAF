@@ -45,9 +45,11 @@ public class ToolResult
 public class ToolRegistry
 {
     private readonly Dictionary<string, ITool> _tools = new();
+    private readonly IGitHubTool _gitHub;
 
-    public ToolRegistry()
+    public ToolRegistry(IGitHubTool gitHub)
     {
+        _gitHub = gitHub;
         RegisterDefaultTools();
     }
 
@@ -162,10 +164,10 @@ public class ToolRegistry
     private void RegisterDefaultTools()
     {
         // Register default tools - can be overridden with real implementations
-        Register(new GitHubSearchTool());
-        Register(new DocumentationSearchTool());
-        Register(new CodeAnalysisTool());
-        Register(new ValidationTool());
+        Register(new GitHubSearchTool(_gitHub));
+        Register(new DocumentationSearchTool(_gitHub));
+        Register(new CodeAnalysisTool(_gitHub));
+        Register(new ValidationTool(_gitHub));
     }
 }
 
@@ -174,6 +176,8 @@ public class ToolRegistry
 /// </summary>
 public class GitHubSearchTool : ITool
 {
+    private readonly IGitHubTool _gitHub;
+
     public string Name => "GitHubSearchTool";
     
     public string Description => "Search GitHub for related issues, pull requests, and discussions to find similar problems and solutions";
@@ -182,22 +186,56 @@ public class GitHubSearchTool : ITool
     {
         new() { Name = "query", Description = "Search query (issue, error message, keywords)", IsRequired = true },
         new() { Name = "search_type", Description = "Type of search", IsRequired = false, AllowedValues = new() { "issues", "discussions", "pull_requests", "all" } },
-        new() { Name = "repo", Description = "Specific repository or 'all' for cross-repo", IsRequired = false }
+        new() { Name = "repo", Description = "Specific repository (owner/name). Defaults to current repo if omitted.", IsRequired = false },
+        new() { Name = "owner", Description = "Repository owner (if repo not provided)", IsRequired = false },
+        new() { Name = "max_results", Description = "Maximum results to return", IsRequired = false }
     };
+
+    public GitHubSearchTool(IGitHubTool gitHub)
+    {
+        _gitHub = gitHub;
+    }
 
     public async Task<ToolResult> ExecuteAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken = default)
     {
-        // This would integrate with actual GitHub API
-        // For now, return placeholder
         var query = parameters.GetValueOrDefault("query", "");
         var searchType = parameters.GetValueOrDefault("search_type", "all");
-        
-        return await Task.FromResult(new ToolResult
+        var repoValue = parameters.GetValueOrDefault("repo", "");
+        var owner = parameters.GetValueOrDefault("owner", "");
+        var maxResults = 5;
+        if (int.TryParse(parameters.GetValueOrDefault("max_results", "5"), out var parsed))
+        {
+            maxResults = Math.Clamp(parsed, 1, 20);
+        }
+
+        if (!string.IsNullOrWhiteSpace(repoValue) && repoValue.Contains('/'))
+        {
+            var parts = repoValue.Split('/', 2);
+            owner = parts[0];
+            repoValue = parts[1];
+        }
+
+        if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repoValue))
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "Missing repository context. Provide 'repo' as owner/name or include 'owner' and 'repo' parameters."
+            };
+        }
+
+        var issues = await _gitHub.SearchIssuesAsync(owner, repoValue, query, maxResults, cancellationToken);
+        var lines = issues.Select(issue => $"#{issue.Number} {issue.Title} ({issue.State}) {issue.HtmlUrl}");
+        var content = lines.Any()
+            ? string.Join("\n", lines)
+            : $"No results found for '{query}' in {owner}/{repoValue}.";
+
+        return new ToolResult
         {
             Success = true,
-            Content = $"GitHub search results for '{query}' ({searchType}): [3 similar issues found]",
-            Metadata = new() { { "search_type", searchType }, { "result_count", "3" } }
-        });
+            Content = content,
+            Metadata = new() { { "search_type", searchType }, { "result_count", issues.Count.ToString() } }
+        };
     }
 }
 
@@ -206,6 +244,8 @@ public class GitHubSearchTool : ITool
 /// </summary>
 public class DocumentationSearchTool : ITool
 {
+    private readonly IGitHubTool _gitHub;
+
     public string Name => "DocumentationSearchTool";
     
     public string Description => "Search project documentation, README, wiki, and official docs for relevant information";
@@ -214,20 +254,111 @@ public class DocumentationSearchTool : ITool
     {
         new() { Name = "query", Description = "Search term or topic", IsRequired = true },
         new() { Name = "doc_type", Description = "Type of documentation", IsRequired = false, AllowedValues = new() { "readme", "wiki", "docs", "api", "all" } },
-        new() { Name = "topic", Description = "Specific topic area", IsRequired = false }
+        new() { Name = "topic", Description = "Specific topic area", IsRequired = false },
+        new() { Name = "paths", Description = "Comma-separated file paths to search (overrides defaults)", IsRequired = false },
+        new() { Name = "repo", Description = "Specific repository (owner/name). Defaults to current repo if omitted.", IsRequired = false },
+        new() { Name = "owner", Description = "Repository owner (if repo not provided)", IsRequired = false }
     };
+
+    public DocumentationSearchTool(IGitHubTool gitHub)
+    {
+        _gitHub = gitHub;
+    }
 
     public async Task<ToolResult> ExecuteAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken = default)
     {
         var query = parameters.GetValueOrDefault("query", "");
         var docType = parameters.GetValueOrDefault("doc_type", "all");
-        
-        return await Task.FromResult(new ToolResult
+        var repoValue = parameters.GetValueOrDefault("repo", "");
+        var owner = parameters.GetValueOrDefault("owner", "");
+
+        if (!string.IsNullOrWhiteSpace(repoValue) && repoValue.Contains('/'))
+        {
+            var parts = repoValue.Split('/', 2);
+            owner = parts[0];
+            repoValue = parts[1];
+        }
+
+        if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repoValue))
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "Missing repository context. Provide 'repo' as owner/name or include 'owner' and 'repo' parameters."
+            };
+        }
+
+        var paths = ResolveDocPaths(parameters);
+        var results = new List<string>();
+
+        foreach (var path in paths)
+        {
+            var content = await _gitHub.GetFileContentAsync(owner, repoValue, path, cancellationToken: cancellationToken);
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                continue;
+            }
+
+            var matches = FindMatches(content, query, 2);
+            if (matches.Count > 0)
+            {
+                results.Add($"[{path}]\n{string.Join("\n", matches)}");
+            }
+        }
+
+        var output = results.Count > 0
+            ? string.Join("\n---\n", results)
+            : $"No documentation matches found for '{query}' in {owner}/{repoValue}.";
+
+        return new ToolResult
         {
             Success = true,
-            Content = $"Documentation search results for '{query}' ({docType}): [2 relevant documents found]",
-            Metadata = new() { { "doc_type", docType }, { "result_count", "2" } }
-        });
+            Content = output,
+            Metadata = new() { { "doc_type", docType }, { "result_count", results.Count.ToString() } }
+        };
+    }
+
+    private static List<string> ResolveDocPaths(Dictionary<string, string> parameters)
+    {
+        var customPaths = parameters.GetValueOrDefault("paths", "");
+        if (!string.IsNullOrWhiteSpace(customPaths))
+        {
+            return customPaths
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        return new List<string>
+        {
+            "README.md",
+            "docs/README.md",
+            "docs/ARCHITECTURE.md",
+            "docs/FAQ.md",
+            "docs/TROUBLESHOOTING.md",
+            "docs/DEPLOYMENT.md",
+            "CONTRIBUTING.md"
+        };
+    }
+
+    private static List<string> FindMatches(string content, string query, int maxMatches)
+    {
+        var results = new List<string>();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return results;
+        }
+
+        var lines = content.Split('\n');
+        for (var i = 0; i < lines.Length && results.Count < maxMatches; i++)
+        {
+            if (lines[i].IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                results.Add(lines[i].Trim());
+            }
+        }
+
+        return results;
     }
 }
 
@@ -236,6 +367,8 @@ public class DocumentationSearchTool : ITool
 /// </summary>
 public class CodeAnalysisTool : ITool
 {
+    private readonly IGitHubTool _gitHub;
+
     public string Name => "CodeAnalysisTool";
     
     public string Description => "Analyze code patterns, versions, dependencies, and configuration to understand technical context";
@@ -244,20 +377,97 @@ public class CodeAnalysisTool : ITool
     {
         new() { Name = "analysis_type", Description = "Type of analysis to perform", IsRequired = true, AllowedValues = new() { "dependencies", "versions", "configuration", "patterns", "error_logs" } },
         new() { Name = "component", Description = "Component or module to analyze", IsRequired = false },
+        new() { Name = "path", Description = "Specific file path to analyze", IsRequired = false },
+        new() { Name = "repo", Description = "Specific repository (owner/name). Defaults to current repo if omitted.", IsRequired = false },
+        new() { Name = "owner", Description = "Repository owner (if repo not provided)", IsRequired = false },
         new() { Name = "depth", Description = "Analysis depth", IsRequired = false, AllowedValues = new() { "shallow", "medium", "deep" } }
     };
+
+    public CodeAnalysisTool(IGitHubTool gitHub)
+    {
+        _gitHub = gitHub;
+    }
 
     public async Task<ToolResult> ExecuteAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken = default)
     {
         var analysisType = parameters.GetValueOrDefault("analysis_type", "");
         var depth = parameters.GetValueOrDefault("depth", "medium");
+        var repoValue = parameters.GetValueOrDefault("repo", "");
+        var owner = parameters.GetValueOrDefault("owner", "");
+        var path = parameters.GetValueOrDefault("path", "");
+        var component = parameters.GetValueOrDefault("component", "");
+
+        if (!string.IsNullOrWhiteSpace(repoValue) && repoValue.Contains('/'))
+        {
+            var parts = repoValue.Split('/', 2);
+            owner = parts[0];
+            repoValue = parts[1];
+        }
+
+        if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repoValue))
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "Missing repository context. Provide 'repo' as owner/name or include 'owner' and 'repo' parameters."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = ResolveComponentPath(component);
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "No file path provided for analysis."
+            };
+        }
+
+        var content = await _gitHub.GetFileContentAsync(owner, repoValue, path, cancellationToken: cancellationToken);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = $"File not found or empty: {path}"
+            };
+        }
+
+        var summary = SummarizeContent(content, analysisType, depth);
         
-        return await Task.FromResult(new ToolResult
+        return new ToolResult
         {
             Success = true,
-            Content = $"Code analysis results ({analysisType}, depth={depth}): [Analysis details here]",
-            Metadata = new() { { "analysis_type", analysisType }, { "depth", depth } }
-        });
+            Content = $"Analysis ({analysisType}, depth={depth}) for {path}:\n{summary}",
+            Metadata = new() { { "analysis_type", analysisType }, { "depth", depth }, { "path", path } }
+        };
+    }
+
+    private static string ResolveComponentPath(string component)
+    {
+        if (string.IsNullOrWhiteSpace(component))
+        {
+            return string.Empty;
+        }
+
+        return component switch
+        {
+            "readme" => "README.md",
+            "docs" => "docs/README.md",
+            _ => component
+        };
+    }
+
+    private static string SummarizeContent(string content, string analysisType, string depth)
+    {
+        var lines = content.Split('\n');
+        var maxLines = depth == "deep" ? 40 : depth == "shallow" ? 10 : 20;
+        var excerpt = string.Join("\n", lines.Take(maxLines).Select(l => l.TrimEnd()));
+        return $"{analysisType} summary (first {maxLines} lines):\n{excerpt}";
     }
 }
 
@@ -266,6 +476,8 @@ public class CodeAnalysisTool : ITool
 /// </summary>
 public class ValidationTool : ITool
 {
+    private readonly IGitHubTool _gitHub;
+
     public string Name => "ValidationTool";
     
     public string Description => "Validate configuration, environment setup, and schema compliance";
@@ -273,19 +485,54 @@ public class ValidationTool : ITool
     public List<ToolParameter> Parameters => new()
     {
         new() { Name = "validation_type", Description = "What to validate", IsRequired = true, AllowedValues = new() { "configuration", "environment", "schema", "dependencies", "all" } },
-        new() { Name = "strict", Description = "Use strict validation", IsRequired = false, AllowedValues = new() { "true", "false" } }
+        new() { Name = "strict", Description = "Use strict validation", IsRequired = false, AllowedValues = new() { "true", "false" } },
+        new() { Name = "path", Description = "Config file path to validate", IsRequired = false },
+        new() { Name = "repo", Description = "Specific repository (owner/name). Defaults to current repo if omitted.", IsRequired = false },
+        new() { Name = "owner", Description = "Repository owner (if repo not provided)", IsRequired = false }
     };
+
+    public ValidationTool(IGitHubTool gitHub)
+    {
+        _gitHub = gitHub;
+    }
 
     public async Task<ToolResult> ExecuteAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken = default)
     {
         var validationType = parameters.GetValueOrDefault("validation_type", "");
         var strict = parameters.GetValueOrDefault("strict", "false") == "true";
+        var repoValue = parameters.GetValueOrDefault("repo", "");
+        var owner = parameters.GetValueOrDefault("owner", "");
+        var path = parameters.GetValueOrDefault("path", "");
+
+        if (!string.IsNullOrWhiteSpace(repoValue) && repoValue.Contains('/'))
+        {
+            var parts = repoValue.Split('/', 2);
+            owner = parts[0];
+            repoValue = parts[1];
+        }
+
+        if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repoValue))
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "Missing repository context. Provide 'repo' as owner/name or include 'owner' and 'repo' parameters."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = "README.md";
+        }
+
+        var content = await _gitHub.GetFileContentAsync(owner, repoValue, path, cancellationToken: cancellationToken);
+        var status = string.IsNullOrWhiteSpace(content) ? "missing" : "present";
         
-        return await Task.FromResult(new ToolResult
+        return new ToolResult
         {
             Success = true,
-            Content = $"Validation results ({validationType}, strict={strict}): [Validation details here]",
-            Metadata = new() { { "validation_type", validationType }, { "strict", strict.ToString() } }
-        });
+            Content = $"Validation ({validationType}, strict={strict}) on {path}: file is {status}.",
+            Metadata = new() { { "validation_type", validationType }, { "strict", strict.ToString() }, { "path", path } }
+        };
     }
 }

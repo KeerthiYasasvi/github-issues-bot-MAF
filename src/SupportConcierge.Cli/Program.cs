@@ -68,13 +68,24 @@ public static class Program
         var triageAgent = new EnhancedTriageAgent(agentLlmClient, schemaValidator);
         var researchAgent = new EnhancedResearchAgent(agentLlmClient, schemaValidator);
         var responseAgent = new EnhancedResponseAgent(agentLlmClient, schemaValidator);
-        var toolRegistry = new ToolRegistry();
+        var casePacketAgent = new CasePacketAgent(agentLlmClient, schemaValidator);
+        var specPackLoader = new SpecPackLoader();
         var gitHubTool = new GitHubTool(token, dryRun, writeMode);
+        var toolRegistry = new ToolRegistry(gitHubTool);
 
         Console.WriteLine($"[MAF] Building workflow for issue #{input.Issue.Number}: {input.Issue.Title}");
 
         // Build MAF workflow
-        var workflow = SupportConciergeWorkflow.Build(triageAgent, researchAgent, responseAgent, critic, orchestrator, toolRegistry, gitHubTool);
+        var workflow = SupportConciergeWorkflow.Build(
+            triageAgent,
+            researchAgent,
+            responseAgent,
+            critic,
+            orchestrator,
+            casePacketAgent,
+            toolRegistry,
+            specPackLoader,
+            gitHubTool);
 
         // Execute workflow
         Console.WriteLine("[MAF] Executing workflow...");

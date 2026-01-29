@@ -36,6 +36,17 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
         var owner = input.Repository?.Owner?.Login ?? string.Empty;
         var repo = input.Repository?.Name ?? string.Empty;
         var issueNumber = input.Issue?.Number ?? 0;
+        var incomingCommentAuthor = input.IncomingComment?.User?.Login ?? string.Empty;
+
+        // Ensure ActiveParticipant is set before we choose the active conversation
+        if (input.EventName == "issue_comment" && !string.IsNullOrWhiteSpace(incomingCommentAuthor))
+        {
+            input.ActiveParticipant = incomingCommentAuthor;
+        }
+        else if (string.IsNullOrWhiteSpace(input.ActiveParticipant))
+        {
+            input.ActiveParticipant = input.Issue?.User?.Login ?? string.Empty;
+        }
 
         if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repo) || issueNumber <= 0)
         {

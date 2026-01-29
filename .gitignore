@@ -38,6 +38,7 @@ docs/
 !README.md
 # Allow prompt templates
 !prompts/
+!prompts/**/*.md
 
 # Developer reference documentation (personal use only)
 IMPLEMENTATION_SUMMARY.md

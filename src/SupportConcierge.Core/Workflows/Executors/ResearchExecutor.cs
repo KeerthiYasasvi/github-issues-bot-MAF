@@ -36,7 +36,19 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         var toolResults = new Dictionary<string, string>();
         foreach (var selectedTool in selectedTools.SelectedTools)
         {
-            var result = await _toolRegistry.ExecuteAsync(selectedTool.ToolName, selectedTool.QueryParameters, ct);
+            var parameters = new Dictionary<string, string>(selectedTool.QueryParameters, StringComparer.OrdinalIgnoreCase);
+            var owner = input.Repository?.Owner?.Login ?? string.Empty;
+            var repo = input.Repository?.Name ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(owner) && !parameters.ContainsKey("owner"))
+            {
+                parameters["owner"] = owner;
+            }
+            if (!string.IsNullOrWhiteSpace(repo) && !parameters.ContainsKey("repo"))
+            {
+                parameters["repo"] = repo;
+            }
+
+            var result = await _toolRegistry.ExecuteAsync(selectedTool.ToolName, parameters, ct);
             if (result.Success)
             {
                 toolResults[selectedTool.ToolName] = result.Content;
