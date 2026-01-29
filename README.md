@@ -24,6 +24,92 @@ More details: `docs/ARCHITECTURE.md`
 
 ## Quick start
 
+### Option A: Deploy as Submodule (Recommended)
+
+For test repositories that need version-controlled bot deployments:
+
+1. **Add bot as submodule to your test repo:**
+   ```bash
+   cd your-test-repo
+   git submodule add https://github.com/KeerthiYasasvi/github-issues-bot-MAF.git bot
+   git submodule update --init --recursive
+   ```
+
+2. **Create workflow file** (`.github/workflows/supportbot.yml`):
+   ```yaml
+   name: Support Concierge Bot
+   
+   on:
+     issues:
+       types: [opened, edited]
+     issue_comment:
+       types: [created]
+   
+   permissions:
+     contents: write
+     issues: write
+   
+   jobs:
+     supportbot:
+       runs-on: ubuntu-latest
+       steps:
+         - name: Checkout
+           uses: actions/checkout@v4
+           with:
+             submodules: recursive  # ← Gets pinned bot version
+   
+         - name: Setup .NET
+           uses: actions/setup-dotnet@v4
+           with:
+             dotnet-version: 8.0.x
+   
+         - name: Run Support Concierge
+           if: github.event_name == 'issues' || github.event.comment.user.login != 'github-actions[bot]'
+           run: dotnet run --project bot/src/SupportConcierge.Cli -- --event-file "$GITHUB_EVENT_PATH"
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+             SUPPORTBOT_USERNAME: github-actions[bot]
+             OPENAI_API_KEY: ${{ secrets.API_KEY }}
+             OPENAI_MODEL: ${{ vars.PRIMARY_MODEL }}
+             OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL }}
+             SUPPORTBOT_DRY_RUN: ${{ vars.SUPPORTBOT_DRY_RUN || 'false' }}
+             SUPPORTBOT_WRITE_MODE: ${{ vars.SUPPORTBOT_WRITE_MODE || 'true' }}
+   
+         - name: Upload metrics
+           if: always()
+           uses: actions/upload-artifact@v4
+           with:
+             name: supportbot-metrics
+             path: artifacts/metrics
+   ```
+
+3. **Configure repo variables/secrets:**
+   - `PRIMARY_MODEL` (repo variable, e.g., "gpt-4o")
+   - `SECONDARY_MODEL` (repo variable, e.g., "gpt-4o-mini")
+   - `API_KEY` (secret, your OpenAI API key)
+   - `SUPPORTBOT_DRY_RUN` (repo variable, "true"/"false")
+   - `SUPPORTBOT_WRITE_MODE` (repo variable, "true"/"false")
+
+4. **Update bot version:**
+   ```bash
+   cd bot
+   git pull origin main
+   cd ..
+   git add bot
+   git commit -m "Update bot to [commit-sha]"
+   git push
+   ```
+
+**Why Submodules?**
+- ✅ Version locking - each test commit pins bot version
+- ✅ Reproducibility - recreate historical scenarios
+- ✅ No race conditions - submodule pointer is committed
+- ✅ Clear deployment - explicit version updates
+
+### Option B: Direct Deployment (Bot Repo Only)
+
+For deploying the bot in its own repository:
+
 1) Configure repo variables/secrets
 - `OPENAI_MODEL` (repo variable)
 - `OPENAI_API_KEY` (secret)
