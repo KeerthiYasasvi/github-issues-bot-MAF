@@ -385,7 +385,7 @@ public class OrchestratorAgent
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[MAF] ResearchGate: Failed to decide research directive: {ex.Message}");
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Failed to decide research directive: {ex.Message}");
             return new ResearchDirective
             {
                 ShouldResearch = true,

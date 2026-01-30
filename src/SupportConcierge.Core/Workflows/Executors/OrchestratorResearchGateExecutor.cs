@@ -31,20 +31,20 @@ public sealed class OrchestratorResearchGateExecutor : Executor<RunContext, RunC
                 ? string.Join(", ", directive.AllowedTools)
                 : "none";
 
-            Console.WriteLine($"[MAF] ResearchGate: should_research={directive.ShouldResearch}, allow_web_search={directive.AllowWebSearch}, query_quality={directive.QueryQuality}");
-            Console.WriteLine($"[MAF] ResearchGate: allowed_tools={tools}");
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): should_research={directive.ShouldResearch}, allow_web_search={directive.AllowWebSearch}, query_quality={directive.QueryQuality}");
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): allowed_tools={tools}");
             if (!string.IsNullOrWhiteSpace(directive.RecommendedQuery))
             {
-                Console.WriteLine($"[MAF] ResearchGate: recommended_query={directive.RecommendedQuery}");
+                Console.WriteLine($"[MAF] Orchestrator(ResearchGate): recommended_query={directive.RecommendedQuery}");
             }
             if (!string.IsNullOrWhiteSpace(directive.Reasoning))
             {
-                Console.WriteLine($"[MAF] ResearchGate: reasoning={directive.Reasoning}");
+                Console.WriteLine($"[MAF] Orchestrator(ResearchGate): reasoning={directive.Reasoning}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[MAF] ResearchGate: Exception while deciding research directive: {ex.Message}");
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Exception while deciding research directive: {ex.Message}");
             input.ResearchDirective = new ResearchDirective
             {
                 ShouldResearch = true,
