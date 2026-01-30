@@ -187,6 +187,22 @@ public class OrchestratorAgent
             context.ExecutionState.LoopActionTaken = "ask_clarifying_questions";
         }
 
+        if (hasEnoughInfo)
+        {
+            if (context.ExecutionState != null)
+            {
+                context.ExecutionState.LoopActionTaken = "provide_response";
+            }
+
+            return new OrchestratorDecision
+            {
+                Action = "respond",
+                Reasoning = "First loop: Sufficient information already provided. Providing response.",
+                ConfidenceScore = 0.8m,
+                NextAgent = "response_agent"
+            };
+        }
+
         return new OrchestratorDecision
         {
             Action = "respond_with_questions",

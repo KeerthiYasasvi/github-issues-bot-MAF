@@ -45,6 +45,9 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         }
 
         // Execute tools
+        EnsureToolQueries(selectedTools.SelectedTools, input, triageResult);
+        EnsureDocumentationTool(selectedTools.SelectedTools, triageResult, input);
+
         var toolResults = new Dictionary<string, string>();
         foreach (var selectedTool in selectedTools.SelectedTools)
         {
@@ -95,6 +98,69 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
 
         input.InvestigationResult = investigationResult;
         return input;
+    }
+
+    private static void EnsureToolQueries(List<SelectedTool> tools, RunContext context, TriageResult triage)
+    {
+        var query = BuildDefaultQuery(context, triage);
+        foreach (var tool in tools)
+        {
+            if (!tool.QueryParameters.TryGetValue("query", out var value) || string.IsNullOrWhiteSpace(value))
+            {
+                tool.QueryParameters["query"] = query;
+            }
+        }
+    }
+
+    private static void EnsureDocumentationTool(List<SelectedTool> tools, TriageResult triage, RunContext context)
+    {
+        var category = triage.Categories.FirstOrDefault() ?? string.Empty;
+        if (!category.Contains("documentation", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (tools.Any(t => t.ToolName.Equals("DocumentationSearchTool", StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        tools.Add(new SelectedTool
+        {
+            ToolName = "DocumentationSearchTool",
+            Reasoning = "Documentation issue should search README/docs directly",
+            QueryParameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["query"] = BuildDefaultQuery(context, triage)
+            }
+        });
+    }
+
+    private static string BuildDefaultQuery(RunContext context, TriageResult triage)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(context.Issue?.Title))
+        {
+            parts.Add(context.Issue.Title);
+        }
+
+        foreach (var detail in triage.ExtractedDetails.Take(4))
+        {
+            if (!string.IsNullOrWhiteSpace(detail.Value))
+            {
+                parts.Add(detail.Value);
+            }
+        }
+
+        var category = triage.Categories.FirstOrDefault() ?? string.Empty;
+        if (category.Contains("documentation", StringComparison.OrdinalIgnoreCase))
+        {
+            parts.Add("README");
+            parts.Add("documentation");
+        }
+
+        var query = string.Join(" ", parts.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase));
+        return string.IsNullOrWhiteSpace(query) ? "documentation" : query;
     }
 
     private static void LogFindings(string stage, InvestigationResult result)

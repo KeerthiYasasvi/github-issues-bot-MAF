@@ -116,7 +116,8 @@ public class EnhancedResearchAgent
         };
 
         var response = await _llmClient.CompleteAsync(request, cancellationToken);
-        return ParseInvestigationResponse(response);
+        response = await EnsureValidJsonAsync(request, response, schema, cancellationToken);
+        return ParseInvestigationResponse(response, schema);
     }
 
     /// <summary>
@@ -168,7 +169,8 @@ public class EnhancedResearchAgent
         };
 
         var response = await _llmClient.CompleteAsync(request, cancellationToken);
-        return ParseInvestigationResponse(response);
+        response = await EnsureValidJsonAsync(request, response, schema, cancellationToken);
+        return ParseInvestigationResponse(response, schema);
     }
 
     private ToolSelectionResult ParseToolSelectionResponse(LlmResponse response)
@@ -230,7 +232,7 @@ public class EnhancedResearchAgent
         }
     }
 
-    private InvestigationResult ParseInvestigationResponse(LlmResponse response)
+    private InvestigationResult ParseInvestigationResponse(LlmResponse response, string schema)
     {
         var defaultResult = new InvestigationResult
         {
@@ -252,6 +254,17 @@ public class EnhancedResearchAgent
         if (!response.IsSuccess)
         {
             return defaultResult;
+        }
+
+        if (!_schemaValidator.TryValidate(response.Content, schema, out _))
+        {
+            var repaired = TryExtractJson(response.Content);
+            if (repaired == null || !_schemaValidator.TryValidate(repaired, schema, out _))
+            {
+                return defaultResult;
+            }
+
+            response = CloneWithContent(response, repaired);
         }
 
         try
@@ -294,6 +307,84 @@ public class EnhancedResearchAgent
         {
             return defaultResult;
         }
+    }
+
+    private async Task<LlmResponse> EnsureValidJsonAsync(
+        LlmRequest request,
+        LlmResponse response,
+        string schema,
+        CancellationToken cancellationToken)
+    {
+        if (response.IsSuccess && _schemaValidator.TryValidate(response.Content, schema, out _))
+        {
+            return response;
+        }
+
+        var repaired = TryExtractJson(response.Content);
+        if (repaired != null && _schemaValidator.TryValidate(repaired, schema, out _))
+        {
+            return CloneWithContent(response, repaired);
+        }
+
+        var retryMessages = new List<LlmMessage>(request.Messages)
+        {
+            new()
+            {
+                Role = "system",
+                Content = "Return valid JSON that matches the provided schema. Do not include markdown or extra text."
+            }
+        };
+
+        var retryRequest = new LlmRequest
+        {
+            Messages = retryMessages,
+            JsonSchema = request.JsonSchema,
+            SchemaName = request.SchemaName,
+            Temperature = request.Temperature
+        };
+
+        return await _llmClient.CompleteAsync(retryRequest, cancellationToken);
+    }
+
+    private static LlmResponse CloneWithContent(LlmResponse response, string content)
+    {
+        return new LlmResponse
+        {
+            Content = content,
+            PromptTokens = response.PromptTokens,
+            CompletionTokens = response.CompletionTokens,
+            TotalTokens = response.TotalTokens,
+            LatencyMs = response.LatencyMs,
+            IsSuccess = response.IsSuccess,
+            RawResponse = response.RawResponse
+        };
+    }
+
+    private static string? TryExtractJson(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return null;
+        }
+
+        var trimmed = content.Trim();
+        trimmed = trimmed.Replace("```json", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("```", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim();
+
+        if (trimmed.StartsWith("{", StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+
+        var start = trimmed.IndexOf('{');
+        var end = trimmed.LastIndexOf('}');
+        if (start >= 0 && end > start)
+        {
+            return trimmed.Substring(start, end - start + 1);
+        }
+
+        return null;
     }
 }
 
