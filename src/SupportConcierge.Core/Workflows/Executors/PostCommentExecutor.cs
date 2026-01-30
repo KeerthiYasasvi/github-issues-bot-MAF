@@ -92,6 +92,9 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             {
                 input.ExecutionState.LastUpdate = DateTime.UtcNow;
             }
+            input.CommentPosted = true;
+            input.PostedCommentCount += 1;
+            input.LastPostedCommentId = comment.Id;
         }
 
         return input;

@@ -92,6 +92,9 @@ public sealed class RunContext
     public bool ShouldFinalize { get; set; }
     public bool ShouldEscalate { get; set; }
     public string? StopReason { get; set; }
+    public bool CommentPosted { get; set; }
+    public int PostedCommentCount { get; set; }
+    public long? LastPostedCommentId { get; set; }
 
     public bool DryRun { get; set; }
     public bool WriteMode { get; set; }

@@ -122,6 +122,7 @@ public static class Program
         // The duplicate comment bug was caused by posting both in workflow AND here
 
         await WriteMetricsAsync(metrics);
+        await WriteTelemetryAsync(resultContext, metricsRecord);
 
         return 0;
     }
@@ -419,5 +420,76 @@ public static class Program
         {
             Console.WriteLine($"[Metrics] Failed to write metrics: {ex.Message}");
         }
+    }
+
+    private static async Task WriteTelemetryAsync(RunContext context, MetricsRecord metricsRecord)
+    {
+        var telemetryDir = Environment.GetEnvironmentVariable("SUPPORTBOT_TELEMETRY_DIR") ?? "artifacts/telemetry";
+        var fileName = $"telemetry_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{metricsRecord.RunId}.json";
+        var loopCount = context.ActiveUserConversation?.LoopCount
+            ?? context.CurrentLoopCount
+            ?? context.ExecutionState?.LoopNumber
+            ?? 1;
+        var commentCount = Math.Max(0, context.PostedCommentCount);
+        var totalTokens = metricsRecord.TokenUsage.TotalTokens;
+        var tokensPerComment = commentCount > 0 ? totalTokens / (double)commentCount : 0;
+        var tokensPerLoop = loopCount > 0 ? totalTokens / (double)loopCount : totalTokens;
+
+        var record = new TelemetryRecord
+        {
+            RunId = metricsRecord.RunId,
+            StartedAt = metricsRecord.StartedAt,
+            CompletedAt = metricsRecord.CompletedAt ?? DateTime.UtcNow,
+            Repository = context.Repository?.FullName ?? string.Empty,
+            IssueNumber = context.Issue?.Number ?? 0,
+            IssueTitle = context.Issue?.Title ?? string.Empty,
+            EventName = context.EventName ?? string.Empty,
+            ActiveUser = context.ActiveParticipant,
+            Decision = ResolveDecision(context),
+            Category = context.CategoryDecision?.Category ?? "unknown",
+            LoopCount = loopCount,
+            CommentPosted = context.CommentPosted,
+            CommentCount = commentCount,
+            LastCommentId = context.LastPostedCommentId,
+            TokenUsage = metricsRecord.TokenUsage,
+            TokensPerComment = tokensPerComment,
+            TokensPerLoop = tokensPerLoop,
+            DecisionPath = context.DecisionPath
+        };
+
+        try
+        {
+            Directory.CreateDirectory(telemetryDir);
+            var path = Path.Combine(telemetryDir, fileName);
+            var json = JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(path, json);
+            Console.WriteLine($"[Telemetry] Saved to {telemetryDir}/{fileName}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Telemetry] Failed to write telemetry: {ex.Message}");
+        }
+    }
+
+    private sealed class TelemetryRecord
+    {
+        public string RunId { get; set; } = string.Empty;
+        public DateTime StartedAt { get; set; }
+        public DateTime CompletedAt { get; set; }
+        public string Repository { get; set; } = string.Empty;
+        public int IssueNumber { get; set; }
+        public string IssueTitle { get; set; } = string.Empty;
+        public string EventName { get; set; } = string.Empty;
+        public string ActiveUser { get; set; } = string.Empty;
+        public string Decision { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public int LoopCount { get; set; }
+        public bool CommentPosted { get; set; }
+        public int CommentCount { get; set; }
+        public long? LastCommentId { get; set; }
+        public TokenUsageSummary TokenUsage { get; set; } = new();
+        public double TokensPerComment { get; set; }
+        public double TokensPerLoop { get; set; }
+        public Dictionary<string, string> DecisionPath { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }
