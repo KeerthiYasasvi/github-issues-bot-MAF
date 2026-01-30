@@ -163,12 +163,13 @@ public class OrchestratorAgent
 
         // Evaluate based on loop stage
         var hasEnoughInfoLoop1 = hasEnoughInfo && !hasMissingInfo;
+        var hasEnoughInfoLoop2And3 = hasEnoughInfo && !hasMissingInfo;
 
         return currentLoop switch
         {
             1 => EvaluateFirstLoop(context, hasEnoughInfoLoop1),
-            2 => EvaluateSecondLoop(context, hasEnoughInfo),
-            3 => EvaluateThirdLoop(context, hasEnoughInfo),
+            2 => EvaluateSecondLoop(context, hasEnoughInfoLoop2And3),
+            3 => EvaluateThirdLoop(context, hasEnoughInfoLoop2And3),
             _ => new OrchestratorDecision
             {
                 Action = "escalate",
