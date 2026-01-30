@@ -31,6 +31,17 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         // Select tools
         var selectedTools = await _researchAgent.SelectToolsAsync(input, triageResult, ct);
         Console.WriteLine($"[MAF] Research: Selected {selectedTools.SelectedTools.Count} tools");
+        if (selectedTools.SelectedTools.Count > 0)
+        {
+            var toolPreview = string.Join("; ", selectedTools.SelectedTools.Take(3)
+                .Select(t =>
+                {
+                    var paramKeys = t.QueryParameters?.Keys?.Take(4) ?? Enumerable.Empty<string>();
+                    var paramPreview = paramKeys.Any() ? $" params[{string.Join(",", paramKeys)}]" : "";
+                    return $"{t.ToolName} ({Truncate(t.Reasoning, 80)}){paramPreview}";
+                }));
+            Console.WriteLine($"[MAF] Research: Tools = {toolPreview}");
+        }
 
         // Execute tools
         var toolResults = new Dictionary<string, string>();
@@ -62,15 +73,18 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         // Investigate
         var investigationResult = await _researchAgent.InvestigateAsync(input, triageResult, selectedTools, toolResults, ct);
         Console.WriteLine($"[MAF] Research: Found {investigationResult.Findings.Count} findings");
+        LogFindings("Research", investigationResult);
 
         // Critique research
         var researchCritique = await _criticAgent.CritiqueResearchAsync(input, null, investigationResult.Findings.Select(f => f.Content).ToList(), ct);
         if (!researchCritique.IsPassable)
         {
             Console.WriteLine($"[MAF] Research (Critique): Failed critique (score: {researchCritique.Score}/10), performing deep dive...");
+            LogCritiqueSummary("Research", researchCritique);
             var deepDiveResults = await _researchAgent.DeepDiveAsync(input, triageResult, investigationResult, researchCritique, new Dictionary<string, string>(), ct);
             investigationResult = deepDiveResults;
             Console.WriteLine($"[MAF] Research: Deep dive completed, now {investigationResult.Findings.Count} findings");
+            LogFindings("Research", investigationResult);
         }
         else
         {
@@ -79,5 +93,48 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
 
         input.InvestigationResult = investigationResult;
         return input;
+    }
+
+    private static void LogFindings(string stage, InvestigationResult result)
+    {
+        var topFindings = result.Findings.Take(3)
+            .Select(f => $"{f.FindingType} (conf {f.Confidence:0.00}) {Truncate(f.Content, 120)}")
+            .ToList();
+        if (topFindings.Count > 0)
+        {
+            Console.WriteLine($"[MAF] {stage}: Findings = {string.Join(" | ", topFindings)}");
+        }
+    }
+
+    private static void LogCritiqueSummary(string stage, CritiqueResult critique)
+    {
+        var issues = critique.Issues
+            .Take(2)
+            .Select(i => $"[{i.Severity}/5] {i.Category}: {Truncate(i.Problem, 120)}")
+            .ToList();
+        var suggestions = critique.Suggestions.Take(2).Select(s => Truncate(s, 120)).ToList();
+
+        if (issues.Count > 0)
+        {
+            Console.WriteLine($"[MAF] {stage} (Critique): Issues = {string.Join(" | ", issues)}");
+        }
+        if (suggestions.Count > 0)
+        {
+            Console.WriteLine($"[MAF] {stage} (Critique): Suggestions = {string.Join(" | ", suggestions)}");
+        }
+        if (!string.IsNullOrWhiteSpace(critique.Reasoning))
+        {
+            Console.WriteLine($"[MAF] {stage} (Critique): Reasoning = {Truncate(critique.Reasoning, 200)}");
+        }
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value.Substring(0, maxLength) + "…";
     }
 }

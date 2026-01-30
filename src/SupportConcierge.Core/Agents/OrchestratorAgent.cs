@@ -150,6 +150,15 @@ public class OrchestratorAgent
         var hasEnoughInfo = deterministicEnough || infoSufficiency.HasEnoughInfo;
 
         context.DecisionPath["info_sufficiency"] = hasEnoughInfo ? "true" : "false";
+        Console.WriteLine($"[MAF] Orchestrator: Sufficiency has_enough_info={infoSufficiency.HasEnoughInfo}, deterministic_enough={deterministicEnough}");
+        if (infoSufficiency.MissingInfo.Count > 0)
+        {
+            Console.WriteLine($"[MAF] Orchestrator: Missing info = {string.Join(", ", infoSufficiency.MissingInfo.Take(4))}");
+        }
+        if (!string.IsNullOrWhiteSpace(infoSufficiency.Reasoning))
+        {
+            Console.WriteLine($"[MAF] Orchestrator: Sufficiency reasoning = {Truncate(infoSufficiency.Reasoning, 200)}");
+        }
 
         // Evaluate based on loop stage
         return currentLoop switch
@@ -430,6 +439,16 @@ public class OrchestratorAgent
     }
 
     private sealed record InfoSufficiencyResult(bool HasEnoughInfo, List<string> MissingInfo, string Reasoning);
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value.Substring(0, maxLength) + "…";
+    }
 }
 
 /// <summary>

@@ -32,15 +32,23 @@ public sealed class TriageExecutor : Executor<RunContext, RunContext>
             Reasoning = triageResult.Reasoning
         };
         Console.WriteLine($"[MAF] Triage: Category = {input.CategoryDecision.Category} (confidence: {triageResult.ConfidenceScore:F2})");
+        Console.WriteLine($"[MAF] Triage: Reasoning = {Truncate(triageResult.Reasoning, 240)}");
+        if (triageResult.ExtractedDetails.Count > 0)
+        {
+            var detailsPreview = string.Join("; ", triageResult.ExtractedDetails.Take(3).Select(kv => $"{kv.Key}={Truncate(kv.Value, 80)}"));
+            Console.WriteLine($"[MAF] Triage: Extracted details preview = {detailsPreview}");
+        }
 
         // Critique triage
         var triageCritique = await _criticAgent.CritiqueTriageAsync(input, input.CategoryDecision, ct);
         if (!triageCritique.IsPassable)
         {
             Console.WriteLine($"[MAF] Triage (Critique): Failed critique (score: {triageCritique.Score}/10), refining...");
+            LogCritiqueSummary("Triage", triageCritique);
             triageResult = await _triageAgent.RefineAsync(input, triageResult, triageCritique, ct);
             input.CategoryDecision.Category = triageResult.Categories.FirstOrDefault() ?? "unclassified";
             Console.WriteLine($"[MAF] Triage: Refined category = {input.CategoryDecision.Category}");
+            Console.WriteLine($"[MAF] Triage: Refined reasoning = {Truncate(triageResult.Reasoning, 240)}");
         }
         else
         {
@@ -49,5 +57,37 @@ public sealed class TriageExecutor : Executor<RunContext, RunContext>
 
         input.TriageResult = triageResult;
         return input;
+    }
+
+    private static void LogCritiqueSummary(string stage, CritiqueResult critique)
+    {
+        var issues = critique.Issues
+            .Take(2)
+            .Select(i => $"[{i.Severity}/5] {i.Category}: {Truncate(i.Problem, 120)}")
+            .ToList();
+        var suggestions = critique.Suggestions.Take(2).Select(s => Truncate(s, 120)).ToList();
+
+        if (issues.Count > 0)
+        {
+            Console.WriteLine($"[MAF] {stage} (Critique): Issues = {string.Join(" | ", issues)}");
+        }
+        if (suggestions.Count > 0)
+        {
+            Console.WriteLine($"[MAF] {stage} (Critique): Suggestions = {string.Join(" | ", suggestions)}");
+        }
+        if (!string.IsNullOrWhiteSpace(critique.Reasoning))
+        {
+            Console.WriteLine($"[MAF] {stage} (Critique): Reasoning = {Truncate(critique.Reasoning, 200)}");
+        }
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value.Substring(0, maxLength) + "…";
     }
 }
