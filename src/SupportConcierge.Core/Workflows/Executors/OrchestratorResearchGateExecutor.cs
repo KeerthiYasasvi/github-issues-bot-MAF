@@ -33,6 +33,11 @@ public sealed class OrchestratorResearchGateExecutor : Executor<RunContext, RunC
 
             Console.WriteLine($"[MAF] Orchestrator(ResearchGate): should_research={directive.ShouldResearch}, allow_web_search={directive.AllowWebSearch}, query_quality={directive.QueryQuality}");
             Console.WriteLine($"[MAF] Orchestrator(ResearchGate): allowed_tools={tools}");
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): budget=max_tools={directive.MaxTools}, max_findings={directive.MaxFindings}");
+            if (directive.ToolPriority.Count > 0)
+            {
+                Console.WriteLine($"[MAF] Orchestrator(ResearchGate): tool_priority={string.Join(", ", directive.ToolPriority)}");
+            }
             if (!string.IsNullOrWhiteSpace(directive.RecommendedQuery))
             {
                 Console.WriteLine($"[MAF] Orchestrator(ResearchGate): recommended_query={directive.RecommendedQuery}");
@@ -49,9 +54,12 @@ public sealed class OrchestratorResearchGateExecutor : Executor<RunContext, RunC
             {
                 ShouldResearch = true,
                 AllowedTools = new List<string> { "GitHubSearchTool", "DocumentationSearchTool" },
+                ToolPriority = new List<string>(),
                 AllowWebSearch = false,
                 QueryQuality = "low",
                 RecommendedQuery = string.Empty,
+                MaxTools = 2,
+                MaxFindings = 5,
                 Reasoning = "Research gate failed; using safe default."
             };
         }

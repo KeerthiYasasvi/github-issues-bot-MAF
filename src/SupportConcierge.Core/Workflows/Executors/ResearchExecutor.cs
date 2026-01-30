@@ -60,12 +60,21 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
                 .ToList();
         }
 
-        if (directive != null && !directive.AllowWebSearch)
+        if (directive != null)
         {
-            selectedTools.SelectedTools = selectedTools.SelectedTools
-                .Where(t => !t.ToolName.Equals("WebSearchTool", StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            var allowWeb = directive.AllowWebSearch
+                           && string.Equals(directive.QueryQuality, "high", StringComparison.OrdinalIgnoreCase)
+                           && !string.IsNullOrWhiteSpace(directive.RecommendedQuery);
+            if (!allowWeb)
+            {
+                selectedTools.SelectedTools = selectedTools.SelectedTools
+                    .Where(t => !t.ToolName.Equals("WebSearchTool", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
         }
+
+        // Ensure documentation search tool for docs issues.
+        EnsureDocumentationTool(selectedTools.SelectedTools, triageResult, input);
 
         if (directive != null && !string.IsNullOrWhiteSpace(directive.RecommendedQuery))
         {
@@ -77,6 +86,20 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
                 }
             }
         }
+
+        // Apply tool priority if provided by orchestrator.
+        if (directive != null && directive.ToolPriority.Count > 0)
+        {
+            selectedTools.SelectedTools = ApplyToolPriority(selectedTools.SelectedTools, directive.ToolPriority);
+        }
+
+        // Apply tool budget (max tools).
+        if (directive != null && directive.MaxTools > 0 && selectedTools.SelectedTools.Count > directive.MaxTools)
+        {
+            selectedTools.SelectedTools = selectedTools.SelectedTools.Take(directive.MaxTools).ToList();
+            Console.WriteLine($"[MAF] Research: Applied tool budget. Using top {directive.MaxTools} tools.");
+        }
+
         input.SelectedTools = selectedTools.SelectedTools.ToList();
         Console.WriteLine($"[MAF] Research: Selected {selectedTools.SelectedTools.Count} tools");
         if (selectedTools.SelectedTools.Count > 0)
@@ -93,7 +116,6 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
 
         // Execute tools
         EnsureToolQueries(selectedTools.SelectedTools, input, triageResult);
-        EnsureDocumentationTool(selectedTools.SelectedTools, triageResult, input);
 
         var toolResults = new Dictionary<string, string>();
         foreach (var selectedTool in selectedTools.SelectedTools)
@@ -123,6 +145,10 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
 
         // Investigate
         var investigationResult = await _researchAgent.InvestigateAsync(input, triageResult, selectedTools, toolResults, ct);
+        if (directive != null && directive.MaxFindings > 0)
+        {
+            TrimFindings(investigationResult, directive.MaxFindings);
+        }
         Console.WriteLine($"[MAF] Research: Found {investigationResult.Findings.Count} findings");
         LogFindings("Research", investigationResult);
 
@@ -135,6 +161,10 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
             var deepDiveResults = await _researchAgent.DeepDiveAsync(input, triageResult, investigationResult, researchCritique, new Dictionary<string, string>(), ct);
             investigationResult = deepDiveResults;
             input.ResearchDeepDived = true;
+            if (directive != null && directive.MaxFindings > 0)
+            {
+                TrimFindings(investigationResult, directive.MaxFindings);
+            }
             Console.WriteLine($"[MAF] Research: Deep dive completed, now {investigationResult.Findings.Count} findings");
             LogFindings("Research", investigationResult);
         }
@@ -157,6 +187,18 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
                 tool.QueryParameters["query"] = query;
             }
         }
+    }
+
+    private static List<SelectedTool> ApplyToolPriority(List<SelectedTool> tools, List<string> priority)
+    {
+        var lookup = priority
+            .Select((name, index) => (name, index))
+            .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+        return tools
+            .OrderBy(t => lookup.TryGetValue(t.ToolName, out var idx) ? idx : int.MaxValue)
+            .ThenBy(t => t.ToolName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static void EnsureDocumentationTool(List<SelectedTool> tools, TriageResult triage, RunContext context)
@@ -241,6 +283,17 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         {
             Console.WriteLine($"[MAF] {stage} (Critique): Reasoning = {Truncate(critique.Reasoning, 200)}");
         }
+    }
+
+    private static void TrimFindings(InvestigationResult result, int maxFindings)
+    {
+        if (maxFindings <= 0 || result.Findings.Count <= maxFindings)
+        {
+            return;
+        }
+
+        result.Findings = result.Findings.Take(maxFindings).ToList();
+        Console.WriteLine($"[MAF] Research: Applied findings budget. Truncated to {maxFindings} findings.");
     }
 
     private static string Truncate(string value, int maxLength)

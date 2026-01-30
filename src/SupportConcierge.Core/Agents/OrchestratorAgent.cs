@@ -362,6 +362,7 @@ public class OrchestratorAgent
                     ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
                     ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
                     ["CATEGORIES"] = categoriesText,
+                    ["TRIAGE_CONFIDENCE"] = triageResult.ConfidenceScore.ToString("0.00"),
                     ["EXTRACTED_DETAILS"] = extractedText,
                     ["CASE_PACKET_FIELDS"] = caseFields,
                     ["AVAILABLE_TOOLS"] = availableTools
@@ -390,9 +391,12 @@ public class OrchestratorAgent
             {
                 ShouldResearch = true,
                 AllowedTools = new List<string> { "GitHubSearchTool", "DocumentationSearchTool" },
+                ToolPriority = new List<string>(),
                 AllowWebSearch = false,
                 QueryQuality = "low",
                 RecommendedQuery = string.Empty,
+                MaxTools = 2,
+                MaxFindings = 5,
                 Reasoning = "Research gate failed; using safe default."
             };
         }
@@ -537,9 +541,12 @@ public class OrchestratorAgent
         {
             ShouldResearch = true,
             AllowedTools = new List<string> { "GitHubSearchTool", "DocumentationSearchTool" },
+            ToolPriority = new List<string>(),
             AllowWebSearch = false,
             QueryQuality = "low",
             RecommendedQuery = string.Empty,
+            MaxTools = 2,
+            MaxFindings = 5,
             Reasoning = "Default research directive."
         };
 
@@ -562,14 +569,23 @@ public class OrchestratorAgent
                     .Where(t => !string.IsNullOrWhiteSpace(t))
                     .ToList()
                 : new List<string>();
+            var priority = json.TryGetProperty("tool_priority", out var priorityProp)
+                ? priorityProp.EnumerateArray()
+                    .Select(t => t.GetString() ?? string.Empty)
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .ToList()
+                : new List<string>();
 
             return new ResearchDirective
             {
                 ShouldResearch = json.GetProperty("should_research").GetBoolean(),
                 AllowedTools = tools,
+                ToolPriority = priority,
                 AllowWebSearch = json.TryGetProperty("allow_web_search", out var allowWeb) && allowWeb.GetBoolean(),
                 QueryQuality = json.TryGetProperty("query_quality", out var quality) ? quality.GetString() ?? "low" : "low",
                 RecommendedQuery = json.TryGetProperty("recommended_query", out var query) ? query.GetString() ?? string.Empty : string.Empty,
+                MaxTools = json.TryGetProperty("max_tools", out var maxTools) ? maxTools.GetInt32() : 0,
+                MaxFindings = json.TryGetProperty("max_findings", out var maxFindings) ? maxFindings.GetInt32() : 0,
                 Reasoning = json.TryGetProperty("reasoning", out var reasoning) ? reasoning.GetString() ?? string.Empty : string.Empty
             };
         }

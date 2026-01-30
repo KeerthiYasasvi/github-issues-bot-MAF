@@ -346,18 +346,29 @@ public static class OrchestrationSchemas
                     type = "array",
                     items = new { type = "string" }
                 },
+                tool_priority = new
+                {
+                    type = "array",
+                    items = new { type = "string" },
+                    description = "Preferred tool order (first = highest priority)"
+                },
                 allow_web_search = new { type = "boolean" },
                 query_quality = new { type = "string", @enum = new[] { "low", "medium", "high" } },
                 recommended_query = new { type = "string" },
+                max_tools = new { type = "integer", minimum = 0, maximum = 6 },
+                max_findings = new { type = "integer", minimum = 0, maximum = 20 },
                 reasoning = new { type = "string" }
             },
             required = new[]
             {
                 "should_research",
                 "allowed_tools",
+                "tool_priority",
                 "allow_web_search",
                 "query_quality",
                 "recommended_query",
+                "max_tools",
+                "max_findings",
                 "reasoning"
             }
         });
