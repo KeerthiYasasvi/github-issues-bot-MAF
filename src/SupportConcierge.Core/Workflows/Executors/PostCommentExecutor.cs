@@ -109,6 +109,32 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             sb.AppendLine();
         }
 
+        if (input.ShouldRedirectOffTopic && input.OffTopicAssessment != null)
+        {
+            var issueTitle = input.Issue?.Title ?? "this issue";
+            var reason = input.OffTopicAssessment.Reason;
+            var suggested = input.OffTopicAssessment.SuggestedAction;
+
+            sb.AppendLine($"It looks like your comment is about something different from this thread ({issueTitle}).");
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                sb.AppendLine();
+                sb.AppendLine($"**Why I think this is off-topic:** {reason}");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("To keep this issue focused, please open a new issue for that topic or reply in the correct thread.");
+            if (!string.IsNullOrWhiteSpace(suggested))
+            {
+                sb.AppendLine();
+                sb.AppendLine($"**Suggested action:** {suggested}");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("If you intended to discuss this issue, please clarify how your comment relates to the current topic.");
+            return sb.ToString().Trim();
+        }
+
         if (input.ShouldStop && input.IsStopCommand)
         {
             // Handle explicit /stop command from user

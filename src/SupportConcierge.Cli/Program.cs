@@ -69,6 +69,7 @@ public static class Program
         var researchAgent = new EnhancedResearchAgent(agentLlmClient, schemaValidator);
         var responseAgent = new EnhancedResponseAgent(agentLlmClient, schemaValidator);
         var casePacketAgent = new CasePacketAgent(agentLlmClient, schemaValidator);
+        var offTopicAgent = new OffTopicAgent(agentLlmClient);
         var specPackLoader = new SpecPackLoader();
         var gitHubTool = new GitHubTool(token, dryRun, writeMode);
         var toolRegistry = new ToolRegistry(gitHubTool);
@@ -83,6 +84,7 @@ public static class Program
             critic,
             orchestrator,
             casePacketAgent,
+            offTopicAgent,
             toolRegistry,
             specPackLoader,
             gitHubTool);
@@ -211,6 +213,10 @@ public static class Program
         if (context.ShouldAskFollowUps || context.FollowUpQuestions.Count > 0)
         {
             return "follow_up";
+        }
+        if (context.ShouldRedirectOffTopic)
+        {
+            return "off_topic";
         }
         if (context.ShouldEscalate)
         {

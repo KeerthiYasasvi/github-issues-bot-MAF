@@ -38,6 +38,7 @@ public static class SupportConciergeWorkflow
         CriticAgent criticAgent,
         OrchestratorAgent orchestratorAgent,
         CasePacketAgent casePacketAgent,
+        OffTopicAgent offTopicAgent,
         ToolRegistry toolRegistry,
         ISpecPackLoader specPackLoader,
         IGitHubTool gitHubTool)
@@ -46,6 +47,7 @@ public static class SupportConciergeWorkflow
         var parseEvent = new ParseEventExecutor();
         var loadState = new LoadStateExecutor(gitHubTool);
         var guardrails = new GuardrailsExecutor();
+        var offTopic = new OffTopicCheckExecutor(offTopicAgent);
         var loadSpecPack = new LoadSpecPackExecutor(specPackLoader);
         var triage = new TriageExecutor(triageAgent, criticAgent);
         var casePacket = new CasePacketExecutor(gitHubTool, casePacketAgent);
@@ -59,6 +61,7 @@ public static class SupportConciergeWorkflow
         var builder = new WorkflowBuilder(parseEvent)
             .BindExecutor(loadState)
             .BindExecutor(guardrails)
+            .BindExecutor(offTopic)
             .BindExecutor(loadSpecPack)
             .BindExecutor(triage)
             .BindExecutor(casePacket)
@@ -76,7 +79,9 @@ public static class SupportConciergeWorkflow
         builder.AddEdge<RunContext>(guardrails, postComment, ctx => ctx?.ShouldStop ?? false);
 
         // Normal flow: Guardrails → Triage → Research → Response → Evaluate
-        builder.AddEdge<RunContext>(guardrails, loadSpecPack, ctx => !(ctx?.ShouldStop ?? false));
+        builder.AddEdge<RunContext>(guardrails, offTopic, ctx => !(ctx?.ShouldStop ?? false));
+        builder.AddEdge<RunContext>(offTopic, postComment, ctx => ctx?.ShouldRedirectOffTopic ?? false);
+        builder.AddEdge<RunContext>(offTopic, loadSpecPack, ctx => !(ctx?.ShouldRedirectOffTopic ?? false));
         builder.AddEdge(loadSpecPack, triage);
         builder.AddEdge(triage, casePacket);
         builder.AddEdge(casePacket, research);

@@ -71,6 +71,8 @@ public sealed class RunContext
     public bool IsStopCommand { get; set; }
     public bool IsDiagnoseCommand { get; set; }
     public bool IsDisagreement { get; set; }
+    public OffTopicAssessment? OffTopicAssessment { get; set; }
+    public bool ShouldRedirectOffTopic { get; set; }
 
     public CategoryDecision? CategoryDecision { get; set; }
     public CasePacket CasePacket { get; } = new();

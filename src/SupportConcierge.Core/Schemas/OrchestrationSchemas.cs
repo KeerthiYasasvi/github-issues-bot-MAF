@@ -362,4 +362,43 @@ public static class OrchestrationSchemas
 
         return JsonSerializer.Serialize(schema);
     }
+
+    /// <summary>
+    /// Schema for off-topic detection
+    /// </summary>
+    public static string GetOffTopicSchema()
+    {
+        var schema = new
+        {
+            type = "object",
+            properties = new
+            {
+                off_topic = new
+                {
+                    type = "boolean",
+                    description = "True if the comment is unrelated to the issue thread"
+                },
+                confidence_score = new
+                {
+                    type = "number",
+                    minimum = 0,
+                    maximum = 1,
+                    description = "Confidence 0-1"
+                },
+                reason = new
+                {
+                    type = "string",
+                    description = "Why the comment is considered off-topic (or not)"
+                },
+                suggested_action = new
+                {
+                    type = "string",
+                    description = "Recommended action (e.g., redirect_new_issue, ask_clarify, continue)"
+                }
+            },
+            required = new[] { "off_topic", "confidence_score", "reason", "suggested_action" }
+        };
+
+        return JsonSerializer.Serialize(schema);
+    }
 }
