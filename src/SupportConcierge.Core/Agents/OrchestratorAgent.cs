@@ -503,7 +503,10 @@ public class OrchestratorAgent
         var response = await _llmClient.CompleteAsync(request, cancellationToken);
         if (!response.IsSuccess)
         {
-            return new InfoSufficiencyResult(false, new List<string>(), "LLM sufficiency check failed");
+            return new InfoSufficiencyResult(
+                false,
+                new List<string> { "sufficiency_check_failed" },
+                "LLM sufficiency check failed");
         }
 
         try
@@ -519,7 +522,10 @@ public class OrchestratorAgent
         }
         catch
         {
-            return new InfoSufficiencyResult(false, new List<string>(), "Failed to parse sufficiency response");
+            return new InfoSufficiencyResult(
+                false,
+                new List<string> { "sufficiency_parse_failed" },
+                "Failed to parse sufficiency response");
         }
     }
 
