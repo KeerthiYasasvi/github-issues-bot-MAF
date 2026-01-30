@@ -163,17 +163,20 @@ public sealed class EvalRunner
         var specPack = LoadSpecPack(scenario.SpecPackPath);
         var specPackLoader = new FakeSpecPackLoader(specPack);
 
-        var workflow = SupportConciergeWorkflow.Build(
-            triageAgent,
-            researchAgent,
-            responseAgent,
-            critic,
-            orchestrator,
-            casePacketAgent,
-            offTopicAgent,
-            toolRegistry,
-            specPackLoader,
-            gitHubTool);
+        Workflow BuildWorkflow()
+        {
+            return SupportConciergeWorkflow.Build(
+                triageAgent,
+                researchAgent,
+                responseAgent,
+                critic,
+                orchestrator,
+                casePacketAgent,
+                offTopicAgent,
+                toolRegistry,
+                specPackLoader,
+                gitHubTool);
+        }
 
         RunContext? finalContext = null;
 
@@ -195,7 +198,7 @@ public sealed class EvalRunner
                     Comment = evt.EventName == "issue_comment" ? incoming : null
                 };
 
-                var run = await InProcessExecution.RunAsync(workflow, input);
+                var run = await InProcessExecution.RunAsync(BuildWorkflow(), input);
                 finalContext = ExtractRunContext(run) ?? finalContext;
             }
         }
@@ -208,7 +211,7 @@ public sealed class EvalRunner
                 Repository = scenario.Repository,
                 Comment = scenario.EventName == "issue_comment" ? scenario.Comments.LastOrDefault() : null
             };
-            var run = await InProcessExecution.RunAsync(workflow, input);
+            var run = await InProcessExecution.RunAsync(BuildWorkflow(), input);
             finalContext = ExtractRunContext(run);
         }
 

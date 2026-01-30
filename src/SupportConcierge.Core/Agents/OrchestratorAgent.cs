@@ -148,6 +148,7 @@ public class OrchestratorAgent
         var infoSufficiency = await AssessInformationSufficiencyAsync(context, plan, cancellationToken);
         var deterministicEnough = (context.Scoring?.IsActionable ?? false) || context.CasePacket.Fields.Count > 0;
         var hasEnoughInfo = deterministicEnough || infoSufficiency.HasEnoughInfo;
+        var hasMissingInfo = infoSufficiency.MissingInfo.Count > 0;
 
         context.DecisionPath["info_sufficiency"] = hasEnoughInfo ? "true" : "false";
         Console.WriteLine($"[MAF] Orchestrator: Sufficiency has_enough_info={infoSufficiency.HasEnoughInfo}, deterministic_enough={deterministicEnough}");
@@ -161,9 +162,11 @@ public class OrchestratorAgent
         }
 
         // Evaluate based on loop stage
+        var hasEnoughInfoLoop1 = hasEnoughInfo && !hasMissingInfo;
+
         return currentLoop switch
         {
-            1 => EvaluateFirstLoop(context, hasEnoughInfo),
+            1 => EvaluateFirstLoop(context, hasEnoughInfoLoop1),
             2 => EvaluateSecondLoop(context, hasEnoughInfo),
             3 => EvaluateThirdLoop(context, hasEnoughInfo),
             _ => new OrchestratorDecision
