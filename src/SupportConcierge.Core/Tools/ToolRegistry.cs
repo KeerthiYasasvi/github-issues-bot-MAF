@@ -168,6 +168,7 @@ public class ToolRegistry
         Register(new DocumentationSearchTool(_gitHub));
         Register(new CodeAnalysisTool(_gitHub));
         Register(new ValidationTool(_gitHub));
+        Register(new WebSearchTool());
     }
 }
 
@@ -534,5 +535,92 @@ public class ValidationTool : ITool
             Content = $"Validation ({validationType}, strict={strict}) on {path}: file is {status}.",
             Metadata = new() { { "validation_type", validationType }, { "strict", strict.ToString() }, { "path", path } }
         };
+    }
+}
+
+/// <summary>
+/// Optional Web Search Tool (guarded by env + confidence threshold).
+/// </summary>
+public sealed class WebSearchTool : ITool
+{
+    public string Name => "WebSearchTool";
+
+    public string Description => "Web search for external references when repo-only tools are insufficient (requires high confidence and explicit enablement)";
+
+    public List<ToolParameter> Parameters => new()
+    {
+        new() { Name = "query", Description = "Search query", IsRequired = true },
+        new() { Name = "confidence", Description = "Confidence (0-1) that web search is required", IsRequired = true },
+        new() { Name = "justification", Description = "Why repo-only tools are insufficient", IsRequired = true }
+    };
+
+    public async Task<ToolResult> ExecuteAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken = default)
+    {
+        if (!parameters.TryGetValue("confidence", out var confidenceValue) ||
+            !decimal.TryParse(confidenceValue, out var confidence) || confidence < 0.85m)
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "Web search blocked: confidence must be >= 0.85"
+            };
+        }
+
+        if (!parameters.TryGetValue("justification", out var justification) ||
+            string.IsNullOrWhiteSpace(justification))
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "Web search blocked: justification is required"
+            };
+        }
+
+        var enabled = string.Equals(Environment.GetEnvironmentVariable("SUPPORTBOT_WEB_SEARCH_ENABLED"), "true", StringComparison.OrdinalIgnoreCase);
+        if (!enabled)
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "Web search disabled (set SUPPORTBOT_WEB_SEARCH_ENABLED=true to allow)"
+            };
+        }
+
+        var endpoint = Environment.GetEnvironmentVariable("SUPPORTBOT_WEB_SEARCH_URL");
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = "Web search endpoint not configured (set SUPPORTBOT_WEB_SEARCH_URL)"
+            };
+        }
+
+        var query = parameters.GetValueOrDefault("query", string.Empty);
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return new ToolResult { Success = false, Error = "Query is required" };
+        }
+
+        try
+        {
+            using var client = new HttpClient();
+            var url = $"{endpoint}?q={Uri.EscapeDataString(query)}";
+            var content = await client.GetStringAsync(url, cancellationToken);
+            return new ToolResult
+            {
+                Success = true,
+                Content = content,
+                Metadata = new() { { "source", endpoint }, { "query", query } }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ToolResult
+            {
+                Success = false,
+                Error = $"Web search failed: {ex.Message}"
+            };
+        }
     }
 }

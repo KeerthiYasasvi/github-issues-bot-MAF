@@ -26,8 +26,23 @@ Conduct deeper investigation addressing the gaps:
 4. Reassess investigation depth (now: {PREV_INVESTIGATION_DEPTH})
 5. Are we ready to respond or need more investigation?
 
+IMPORTANT OUTPUT RULES:
+- Output MUST be valid JSON only.
+- Do NOT include markdown, code fences, or extra text.
+- Include ALL required fields, even if empty (use "" or []).
+
 Return enhanced JSON with:
 - tools_used: All tools used across both investigations
 - findings: Complete set of findings including new ones
 - investigation_depth: Updated assessment (likely 'deep' now)
 - next_steps_recommended: Any remaining gaps
+
+Example JSON (structure only; do not copy values):
+{
+  "tools_used": ["DocumentationSearchTool"],
+  "findings": [
+    { "finding_type": "documentation", "content": "README lacks output path", "source": "DocumentationSearchTool", "confidence": 0.6 }
+  ],
+  "investigation_depth": "deep",
+  "next_steps_recommended": []
+}

@@ -112,7 +112,7 @@ public class EnhancedResearchAgent
             },
             JsonSchema = schema,
             SchemaName = "ResearchResult",
-            Temperature = 0.4
+            Temperature = 0.2
         };
 
         var response = await _llmClient.CompleteAsync(request, cancellationToken);
@@ -165,7 +165,7 @@ public class EnhancedResearchAgent
             },
             JsonSchema = schema,
             SchemaName = "ResearchResult",
-            Temperature = 0.4
+            Temperature = 0.2
         };
 
         var response = await _llmClient.CompleteAsync(request, cancellationToken);
