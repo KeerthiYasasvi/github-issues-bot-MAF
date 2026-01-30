@@ -350,33 +350,49 @@ public class OrchestratorAgent
         var extractedText = string.Join("; ", triageResult.ExtractedDetails.Select(kv => $"{kv.Key}: {kv.Value}"));
         var caseFields = string.Join("; ", casePacket.Fields.Select(kv => $"{kv.Key}: {kv.Value}"));
 
-        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
-            "orchestrator-research-gate.md",
-            new Dictionary<string, string>
-            {
-                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
-                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
-                ["CATEGORIES"] = categoriesText,
-                ["EXTRACTED_DETAILS"] = extractedText,
-                ["CASE_PACKET_FIELDS"] = caseFields,
-                ["AVAILABLE_TOOLS"] = availableTools
-            },
-            cancellationToken);
-
-        var request = new LlmRequest
+        try
         {
-            Messages = new List<LlmMessage>
-            {
-                new() { Role = "system", Content = systemPrompt },
-                new() { Role = "user", Content = userPrompt }
-            },
-            JsonSchema = schema,
-            SchemaName = "ResearchDirective",
-            Temperature = 0.2
-        };
+            var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+                "orchestrator-research-gate.md",
+                new Dictionary<string, string>
+                {
+                    ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                    ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
+                    ["CATEGORIES"] = categoriesText,
+                    ["EXTRACTED_DETAILS"] = extractedText,
+                    ["CASE_PACKET_FIELDS"] = caseFields,
+                    ["AVAILABLE_TOOLS"] = availableTools
+                },
+                cancellationToken);
 
-        var response = await _llmClient.CompleteAsync(request, cancellationToken);
-        return ParseResearchDirective(response, schema);
+            var request = new LlmRequest
+            {
+                Messages = new List<LlmMessage>
+                {
+                    new() { Role = "system", Content = systemPrompt },
+                    new() { Role = "user", Content = userPrompt }
+                },
+                JsonSchema = schema,
+                SchemaName = "ResearchDirective",
+                Temperature = 0.2
+            };
+
+            var response = await _llmClient.CompleteAsync(request, cancellationToken);
+            return ParseResearchDirective(response, schema);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MAF] ResearchGate: Failed to decide research directive: {ex.Message}");
+            return new ResearchDirective
+            {
+                ShouldResearch = true,
+                AllowedTools = new List<string> { "GitHubSearchTool", "DocumentationSearchTool" },
+                AllowWebSearch = false,
+                QueryQuality = "low",
+                RecommendedQuery = string.Empty,
+                Reasoning = "Research gate failed; using safe default."
+            };
+        }
     }
 
     /// <summary>

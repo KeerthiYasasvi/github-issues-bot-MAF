@@ -19,25 +19,41 @@ public sealed class OrchestratorResearchGateExecutor : Executor<RunContext, RunC
 
     public override async ValueTask<RunContext> HandleAsync(RunContext input, IWorkflowContext context, CancellationToken ct = default)
     {
-        var triageResult = input.TriageResult ?? new TriageResult();
-        var casePacket = input.CasePacket ?? new CasePacket();
-
-        var directive = await _orchestrator.DecideResearchAsync(input, triageResult, casePacket, ct);
-        input.ResearchDirective = directive;
-
-        var tools = directive.AllowedTools.Count > 0
-            ? string.Join(", ", directive.AllowedTools)
-            : "none";
-
-        Console.WriteLine($"[MAF] ResearchGate: should_research={directive.ShouldResearch}, allow_web_search={directive.AllowWebSearch}, query_quality={directive.QueryQuality}");
-        Console.WriteLine($"[MAF] ResearchGate: allowed_tools={tools}");
-        if (!string.IsNullOrWhiteSpace(directive.RecommendedQuery))
+        try
         {
-            Console.WriteLine($"[MAF] ResearchGate: recommended_query={directive.RecommendedQuery}");
+            var triageResult = input.TriageResult ?? new TriageResult();
+            var casePacket = input.CasePacket ?? new CasePacket();
+
+            var directive = await _orchestrator.DecideResearchAsync(input, triageResult, casePacket, ct);
+            input.ResearchDirective = directive;
+
+            var tools = directive.AllowedTools.Count > 0
+                ? string.Join(", ", directive.AllowedTools)
+                : "none";
+
+            Console.WriteLine($"[MAF] ResearchGate: should_research={directive.ShouldResearch}, allow_web_search={directive.AllowWebSearch}, query_quality={directive.QueryQuality}");
+            Console.WriteLine($"[MAF] ResearchGate: allowed_tools={tools}");
+            if (!string.IsNullOrWhiteSpace(directive.RecommendedQuery))
+            {
+                Console.WriteLine($"[MAF] ResearchGate: recommended_query={directive.RecommendedQuery}");
+            }
+            if (!string.IsNullOrWhiteSpace(directive.Reasoning))
+            {
+                Console.WriteLine($"[MAF] ResearchGate: reasoning={directive.Reasoning}");
+            }
         }
-        if (!string.IsNullOrWhiteSpace(directive.Reasoning))
+        catch (Exception ex)
         {
-            Console.WriteLine($"[MAF] ResearchGate: reasoning={directive.Reasoning}");
+            Console.WriteLine($"[MAF] ResearchGate: Exception while deciding research directive: {ex.Message}");
+            input.ResearchDirective = new ResearchDirective
+            {
+                ShouldResearch = true,
+                AllowedTools = new List<string> { "GitHubSearchTool", "DocumentationSearchTool" },
+                AllowWebSearch = false,
+                QueryQuality = "low",
+                RecommendedQuery = string.Empty,
+                Reasoning = "Research gate failed; using safe default."
+            };
         }
 
         return input;

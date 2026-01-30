@@ -66,6 +66,7 @@ public static class SupportConciergeWorkflow
             .BindExecutor(loadSpecPack)
             .BindExecutor(triage)
             .BindExecutor(casePacket)
+            .BindExecutor(researchGate)
             .BindExecutor(research)
             .BindExecutor(response)
             .BindExecutor(orchestratorEvaluate)
