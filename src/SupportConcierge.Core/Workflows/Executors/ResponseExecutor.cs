@@ -50,6 +50,7 @@ public sealed class ResponseExecutor : Executor<RunContext, RunContext>
             Console.WriteLine($"[MAF] Response (Critique): Failed critique (score: {responseCritique.Score}/10), refining...");
             LogCritiqueSummary("Response", responseCritique);
             responseResult = await _responseAgent.RefineAsync(input, triageResult, investigationResult, responseResult, responseCritique, ct);
+            input.ResponseRefined = true;
             input.Brief = new EngineerBrief
             {
                 Summary = responseResult.Brief.Summary,

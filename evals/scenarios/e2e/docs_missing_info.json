@@ -1,15 +1,15 @@
 {
-  "name": "build_missing_details",
+  "name": "docs_missing_info",
   "eventName": "issues",
   "issue": {
-    "number": 12,
-    "title": "Build fails on Ubuntu",
-    "body": "## Operating System\nUbuntu 22.04\n\n## Version\n1.4.0\n\n## Description\nBuild fails when I run the project locally.",
+    "number": 201,
+    "title": "README missing Spark output path",
+    "body": "The README says Spark writes Parquet files but does not say where the files are written.",
     "user": { "login": "alice" },
     "state": "open",
     "labels": [],
     "assignees": [],
-    "html_url": "https://github.com/octo-org/sample-repo/issues/12"
+    "html_url": "https://github.com/octo-org/sample-repo/issues/201"
   },
   "repository": {
     "name": "sample-repo",
@@ -19,10 +19,11 @@
   },
   "comments": [],
   "specPackPath": "evals/specpack.json",
-  "tags": ["ci", "golden"],
+  "tags": ["ci"],
   "expectations": {
     "expectedDecision": "follow_up",
-    "expectedCategory": "build",
-    "minFollowUpQuestions": 0
+    "expectedCategory": "docs",
+    "minFollowUpQuestions": 1,
+    "requiredQuestionKeywords": ["section", "missing", "instead"]
   }
 }

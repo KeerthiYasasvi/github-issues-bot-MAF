@@ -19,8 +19,9 @@
   },
   "comments": [],
   "specPackPath": "evals/specpack.json",
+  "tags": ["ci", "golden"],
   "expectations": {
-    "expectedDecision": "finalize",
+    "expectedDecision": "follow_up",
     "expectedCategory": "runtime",
     "minCompleteness": 75
   }

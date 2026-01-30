@@ -1,0 +1,39 @@
+{
+  "name": "multiuser_allowlist",
+  "issue": {
+    "number": 206,
+    "title": "Multi-user allow list test",
+    "body": "Testing multi-user conversation handling.",
+    "user": { "login": "owner" },
+    "state": "open",
+    "labels": [],
+    "assignees": [],
+    "html_url": "https://github.com/octo-org/sample-repo/issues/206"
+  },
+  "repository": {
+    "name": "sample-repo",
+    "owner": { "login": "octo-org" },
+    "full_name": "octo-org/sample-repo",
+    "default_branch": "main"
+  },
+  "comments": [],
+  "events": [
+    {
+      "eventName": "issue_comment",
+      "commentBody": "/diagnose I want to help on this issue.",
+      "commentAuthor": "bob"
+    },
+    {
+      "eventName": "issue_comment",
+      "commentBody": "Here are more details on the doc location.",
+      "commentAuthor": "bob"
+    }
+  ],
+  "specPackPath": "evals/specpack.json",
+  "expectations": {
+    "expectedUserLoopCounts": {
+      "bob": 2
+    },
+    "expectedAllowedUsers": ["owner", "bob"]
+  }
+}

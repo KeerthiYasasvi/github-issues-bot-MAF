@@ -1,0 +1,33 @@
+{
+  "name": "offtopic_redirect",
+  "eventName": "issue_comment",
+  "issue": {
+    "number": 203,
+    "title": "Submodule deployment verification - Code fence state persistence test",
+    "body": "This issue verifies that submodule deployment and state persistence works.",
+    "user": { "login": "owner" },
+    "state": "open",
+    "labels": [],
+    "assignees": [],
+    "html_url": "https://github.com/octo-org/sample-repo/issues/203"
+  },
+  "repository": {
+    "name": "sample-repo",
+    "owner": { "login": "octo-org" },
+    "full_name": "octo-org/sample-repo",
+    "default_branch": "main"
+  },
+  "comments": [
+    {
+      "id": 1,
+      "body": "EVAL_OFF_TOPIC: The README says Spark writes Parquet but doesn't say where. Please add the output path.",
+      "user": { "login": "yk617" },
+      "created_at": "2026-01-30T00:00:00Z"
+    }
+  ],
+  "specPackPath": "evals/specpack.json",
+  "expectations": {
+    "expectedDecision": "off_topic",
+    "expectOffTopicRedirect": true
+  }
+}

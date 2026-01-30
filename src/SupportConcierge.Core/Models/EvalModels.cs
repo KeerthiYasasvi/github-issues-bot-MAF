@@ -9,9 +9,18 @@ public sealed class EvalScenario
     public GitHubIssue Issue { get; set; } = new();
     public GitHubRepository Repository { get; set; } = new();
     public List<GitHubComment> Comments { get; set; } = new();
+    public List<EvalEvent> Events { get; set; } = new();
+    public List<string> Tags { get; set; } = new();
     public string? SpecPackPath { get; set; }
     public SpecPackConfig SpecPack { get; set; } = new();
     public EvalExpectations? Expectations { get; set; }
+}
+
+public sealed class EvalEvent
+{
+    public string EventName { get; set; } = "issue_comment";
+    public string CommentBody { get; set; } = string.Empty;
+    public string CommentAuthor { get; set; } = string.Empty;
 }
 
 public sealed class EvalExpectations
@@ -21,6 +30,20 @@ public sealed class EvalExpectations
     public int? MinCompleteness { get; set; }
     public int? MaxCompleteness { get; set; }
     public int? MinFollowUpQuestions { get; set; }
+    public int? MaxFollowUpQuestions { get; set; }
+    public List<string> RequiredQuestionKeywords { get; set; } = new();
+    public List<string> ForbiddenQuestionKeywords { get; set; } = new();
+    public List<string> ExpectedTools { get; set; } = new();
+    public bool? ExpectOffTopicRedirect { get; set; }
+    public bool? ExpectNoSecretsRequested { get; set; }
+    public bool? ExpectTriageRefinement { get; set; }
+    public bool? ExpectResearchDeepDive { get; set; }
+    public bool? ExpectResponseRefinement { get; set; }
+    public bool? ExpectInfoSufficient { get; set; }
+    public Dictionary<string, int> ExpectedUserLoopCounts { get; set; } = new();
+    public List<string> ExpectedAllowedUsers { get; set; } = new();
+    public double? MaxLatencyMs { get; set; }
+    public int? MaxTotalTokens { get; set; }
 }
 
 public sealed class EvalResult

@@ -46,6 +46,7 @@ public sealed class TriageExecutor : Executor<RunContext, RunContext>
             Console.WriteLine($"[MAF] Triage (Critique): Failed critique (score: {triageCritique.Score}/10), refining...");
             LogCritiqueSummary("Triage", triageCritique);
             triageResult = await _triageAgent.RefineAsync(input, triageResult, triageCritique, ct);
+            input.TriageRefined = true;
             input.CategoryDecision.Category = triageResult.Categories.FirstOrDefault() ?? "unclassified";
             Console.WriteLine($"[MAF] Triage: Refined category = {input.CategoryDecision.Category}");
             Console.WriteLine($"[MAF] Triage: Refined reasoning = {Truncate(triageResult.Reasoning, 240)}");

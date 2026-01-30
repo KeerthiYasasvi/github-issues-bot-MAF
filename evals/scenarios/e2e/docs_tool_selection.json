@@ -1,0 +1,26 @@
+{
+  "name": "docs_tool_selection",
+  "eventName": "issues",
+  "issue": {
+    "number": 204,
+    "title": "Documentation unclear about output path",
+    "body": "README lacks the output path for Spark parquet files.",
+    "user": { "login": "alice" },
+    "state": "open",
+    "labels": [],
+    "assignees": [],
+    "html_url": "https://github.com/octo-org/sample-repo/issues/204"
+  },
+  "repository": {
+    "name": "sample-repo",
+    "owner": { "login": "octo-org" },
+    "full_name": "octo-org/sample-repo",
+    "default_branch": "main"
+  },
+  "comments": [],
+  "specPackPath": "evals/specpack.json",
+  "expectations": {
+    "expectedCategory": "docs",
+    "expectedTools": ["DocumentationSearchTool"]
+  }
+}

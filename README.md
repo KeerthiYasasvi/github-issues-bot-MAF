@@ -138,12 +138,24 @@ dotnet run --project src/SupportConcierge.Cli -- --smoke
 
 ## Evals
 
-The previous CLI eval runner has been removed during the MAF migration. Current status:
-- CLI eval entrypoint: **removed** (EvalRunner.cs deleted)
-- Scenarios and fixtures remain in `evals/` for future reuse
-- To re-enable evals, wire a new MAF-based runner that loads scenarios from `evals/` and executes the MAF workflow with `SUPPORTBOT_NO_LLM=true` for deterministic validation.
+Evals are enabled and run in two modes:
 
-Details: `docs/EVALS.md`
+- **Offline deterministic** (default): uses a heuristic LLM so evals run without network access.
+- **Live LLM**: set `SUPPORTBOT_EVAL_USE_LLM=true` to run against real models.
+
+Run all evals:
+
+```bash
+dotnet run --project src/SupportConcierge.Cli -- --eval --scenarios-dir evals/scenarios --output-dir artifacts/evals
+```
+
+Run a CI subset only:
+
+```bash
+dotnet run --project src/SupportConcierge.Cli -- --eval --subset ci
+```
+
+More details: `evals/README.md`
 
 ## Repo layout
 

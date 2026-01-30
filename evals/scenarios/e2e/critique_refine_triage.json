@@ -1,0 +1,26 @@
+{
+  "name": "critique_refine_triage",
+  "eventName": "issues",
+  "issue": {
+    "number": 205,
+    "title": "EVAL_FAIL_TRIAGE: docs missing info",
+    "body": "EVAL_FAIL_TRIAGE The README is missing the output path.",
+    "user": { "login": "alice" },
+    "state": "open",
+    "labels": [],
+    "assignees": [],
+    "html_url": "https://github.com/octo-org/sample-repo/issues/205"
+  },
+  "repository": {
+    "name": "sample-repo",
+    "owner": { "login": "octo-org" },
+    "full_name": "octo-org/sample-repo",
+    "default_branch": "main"
+  },
+  "comments": [],
+  "specPackPath": "evals/specpack.json",
+  "expectations": {
+    "expectedCategory": "docs",
+    "expectTriageRefinement": true
+  }
+}

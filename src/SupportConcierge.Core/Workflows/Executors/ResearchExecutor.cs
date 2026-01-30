@@ -30,6 +30,7 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
 
         // Select tools
         var selectedTools = await _researchAgent.SelectToolsAsync(input, triageResult, ct);
+        input.SelectedTools = selectedTools.SelectedTools.ToList();
         Console.WriteLine($"[MAF] Research: Selected {selectedTools.SelectedTools.Count} tools");
         if (selectedTools.SelectedTools.Count > 0)
         {
@@ -83,6 +84,7 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
             LogCritiqueSummary("Research", researchCritique);
             var deepDiveResults = await _researchAgent.DeepDiveAsync(input, triageResult, investigationResult, researchCritique, new Dictionary<string, string>(), ct);
             investigationResult = deepDiveResults;
+            input.ResearchDeepDived = true;
             Console.WriteLine($"[MAF] Research: Deep dive completed, now {investigationResult.Findings.Count} findings");
             LogFindings("Research", investigationResult);
         }

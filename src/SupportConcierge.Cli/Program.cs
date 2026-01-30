@@ -20,12 +20,12 @@ public static class Program
 
         if (args.Contains("--eval"))
         {
-            Console.WriteLine("ERROR: Eval runner temporarily disabled during agentic migration");
-            return 1;
-            // var scenariosDir = GetArgValue(args, "--scenarios-dir") ?? Environment.GetEnvironmentVariable("SUPPORTBOT_EVAL_DIR") ?? "evals/scenarios";
-            // var outputDir = GetArgValue(args, "--output-dir") ?? "artifacts/evals";
-            // var evalRunner = new SupportConcierge.Cli.Evals.EvalRunner();
-            // return await evalRunner.RunAllAsync(scenariosDir, outputDir);
+            var scenariosDir = GetArgValue(args, "--scenarios-dir") ?? Environment.GetEnvironmentVariable("SUPPORTBOT_EVAL_DIR") ?? "evals/scenarios";
+            var outputDir = GetArgValue(args, "--output-dir") ?? "artifacts/evals";
+            var subset = GetArgValue(args, "--subset") ?? Environment.GetEnvironmentVariable("SUPPORTBOT_EVAL_SUBSET");
+            var useLiveLlm = ParseBool(Environment.GetEnvironmentVariable("SUPPORTBOT_EVAL_USE_LLM"));
+            var evalRunner = new SupportConcierge.Cli.Evals.EvalRunner();
+            return await evalRunner.RunAllAsync(scenariosDir, outputDir, subset, useLiveLlm);
         }
 
         var eventFile = GetArgValue(args, "--event-file") ?? Environment.GetEnvironmentVariable("GITHUB_EVENT_PATH");

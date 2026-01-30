@@ -1,0 +1,28 @@
+{
+  "name": "docs_complete_info",
+  "eventName": "issues",
+  "issue": {
+    "number": 202,
+    "title": "README should specify Spark output directory",
+    "body": "File: README.md\nSection: Running the Pipeline\nProblem: The README says Spark writes Parquet but does not specify the output directory.\nFix: Add 'Spark writes Parquet files under spark_output/ (project root)'.",
+    "user": { "login": "alice" },
+    "state": "open",
+    "labels": [],
+    "assignees": [],
+    "html_url": "https://github.com/octo-org/sample-repo/issues/202"
+  },
+  "repository": {
+    "name": "sample-repo",
+    "owner": { "login": "octo-org" },
+    "full_name": "octo-org/sample-repo",
+    "default_branch": "main"
+  },
+  "comments": [],
+  "specPackPath": "evals/specpack.json",
+  "expectations": {
+    "expectedDecision": "follow_up",
+    "expectedCategory": "docs",
+    "minCompleteness": 30,
+    "expectInfoSufficient": true
+  }
+}

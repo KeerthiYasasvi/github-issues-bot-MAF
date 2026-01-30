@@ -73,6 +73,10 @@ public sealed class RunContext
     public bool IsDisagreement { get; set; }
     public OffTopicAssessment? OffTopicAssessment { get; set; }
     public bool ShouldRedirectOffTopic { get; set; }
+    public bool TriageRefined { get; set; }
+    public bool ResearchDeepDived { get; set; }
+    public bool ResponseRefined { get; set; }
+    public List<SupportConcierge.Core.Agents.SelectedTool> SelectedTools { get; set; } = new();
 
     public CategoryDecision? CategoryDecision { get; set; }
     public CasePacket CasePacket { get; } = new();
