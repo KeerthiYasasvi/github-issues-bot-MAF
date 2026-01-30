@@ -77,6 +77,7 @@ public sealed class RunContext
     public bool ResearchDeepDived { get; set; }
     public bool ResponseRefined { get; set; }
     public List<SupportConcierge.Core.Agents.SelectedTool> SelectedTools { get; set; } = new();
+    public ResearchDirective? ResearchDirective { get; set; }
 
     public CategoryDecision? CategoryDecision { get; set; }
     public CasePacket CasePacket { get; } = new();

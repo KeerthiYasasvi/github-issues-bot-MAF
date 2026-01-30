@@ -28,12 +28,19 @@ public sealed class ResponseExecutor : Executor<RunContext, RunContext>
 
         // Generate response
         var responseResult = await _responseAgent.GenerateResponseAsync(input, triageResult, investigationResult, ct);
+        var keyEvidence = new List<string>();
+        if (!string.IsNullOrWhiteSpace(responseResult.Brief.Explanation))
+        {
+            keyEvidence.Add(responseResult.Brief.Explanation);
+        }
+        keyEvidence.AddRange(ExtractIssueReferences(investigationResult));
+
         input.Brief = new EngineerBrief
         {
             Summary = responseResult.Brief.Summary,
             Symptoms = new List<string> { responseResult.Brief.Title },
             Environment = new Dictionary<string, string>(),
-            KeyEvidence = new List<string> { responseResult.Brief.Explanation },
+            KeyEvidence = keyEvidence,
             NextSteps = responseResult.Brief.NextSteps
         };
         Console.WriteLine($"[MAF] Response: Generated brief - {responseResult.Brief.Summary}");
@@ -51,12 +58,19 @@ public sealed class ResponseExecutor : Executor<RunContext, RunContext>
             LogCritiqueSummary("Response", responseCritique);
             responseResult = await _responseAgent.RefineAsync(input, triageResult, investigationResult, responseResult, responseCritique, ct);
             input.ResponseRefined = true;
+            var refinedEvidence = new List<string>();
+            if (!string.IsNullOrWhiteSpace(responseResult.Brief.Explanation))
+            {
+                refinedEvidence.Add(responseResult.Brief.Explanation);
+            }
+            refinedEvidence.AddRange(ExtractIssueReferences(investigationResult));
+
             input.Brief = new EngineerBrief
             {
                 Summary = responseResult.Brief.Summary,
                 Symptoms = new List<string> { responseResult.Brief.Title },
                 Environment = new Dictionary<string, string>(),
-                KeyEvidence = new List<string> { responseResult.Brief.Explanation },
+                KeyEvidence = refinedEvidence,
                 NextSteps = responseResult.Brief.NextSteps
             };
             Console.WriteLine("[MAF] Response: Refined brief");
@@ -90,6 +104,29 @@ public sealed class ResponseExecutor : Executor<RunContext, RunContext>
         {
             Console.WriteLine($"[MAF] {stage} (Critique): Reasoning = {Truncate(critique.Reasoning, 200)}");
         }
+    }
+
+    private static List<string> ExtractIssueReferences(InvestigationResult investigationResult)
+    {
+        var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var findings = investigationResult.Findings ?? new List<Finding>();
+        var pattern = new System.Text.RegularExpressions.Regex(
+            @"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\d+",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        foreach (var finding in findings)
+        {
+            var content = $"{finding.Source} {finding.Content}";
+            foreach (System.Text.RegularExpressions.Match match in pattern.Matches(content))
+            {
+                if (!string.IsNullOrWhiteSpace(match.Value))
+                {
+                    results.Add($"Related issue: {match.Value}");
+                }
+            }
+        }
+
+        return results.ToList();
     }
 
     private static string Truncate(string value, int maxLength)

@@ -329,6 +329,56 @@ public class OrchestratorAgent
             };
     }
 
+    public async Task<ResearchDirective> DecideResearchAsync(
+        RunContext context,
+        TriageResult triageResult,
+        CasePacket casePacket,
+        CancellationToken cancellationToken = default)
+    {
+        var schema = OrchestrationSchemas.GetResearchDirectiveSchema();
+
+        var availableTools = string.Join(", ", new[]
+        {
+            "GitHubSearchTool",
+            "DocumentationSearchTool",
+            "CodeAnalysisTool",
+            "ValidationTool",
+            "WebSearchTool"
+        });
+
+        var categoriesText = string.Join(", ", triageResult.Categories);
+        var extractedText = string.Join("; ", triageResult.ExtractedDetails.Select(kv => $"{kv.Key}: {kv.Value}"));
+        var caseFields = string.Join("; ", casePacket.Fields.Select(kv => $"{kv.Key}: {kv.Value}"));
+
+        var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
+            "orchestrator-research-gate.md",
+            new Dictionary<string, string>
+            {
+                ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
+                ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
+                ["CATEGORIES"] = categoriesText,
+                ["EXTRACTED_DETAILS"] = extractedText,
+                ["CASE_PACKET_FIELDS"] = caseFields,
+                ["AVAILABLE_TOOLS"] = availableTools
+            },
+            cancellationToken);
+
+        var request = new LlmRequest
+        {
+            Messages = new List<LlmMessage>
+            {
+                new() { Role = "system", Content = systemPrompt },
+                new() { Role = "user", Content = userPrompt }
+            },
+            JsonSchema = schema,
+            SchemaName = "ResearchDirective",
+            Temperature = 0.2
+        };
+
+        var response = await _llmClient.CompleteAsync(request, cancellationToken);
+        return ParseResearchDirective(response, schema);
+    }
+
     /// <summary>
     /// Replan if current approach isn't working
     /// </summary>
@@ -455,6 +505,54 @@ public class OrchestratorAgent
     }
 
     private sealed record InfoSufficiencyResult(bool HasEnoughInfo, List<string> MissingInfo, string Reasoning);
+
+    private ResearchDirective ParseResearchDirective(LlmResponse response, string schema)
+    {
+        var defaultDirective = new ResearchDirective
+        {
+            ShouldResearch = true,
+            AllowedTools = new List<string> { "GitHubSearchTool", "DocumentationSearchTool" },
+            AllowWebSearch = false,
+            QueryQuality = "low",
+            RecommendedQuery = string.Empty,
+            Reasoning = "Default research directive."
+        };
+
+        if (!response.IsSuccess)
+        {
+            return defaultDirective;
+        }
+
+        if (!_schemaValidator.TryValidate(response.Content, schema, out _))
+        {
+            return defaultDirective;
+        }
+
+        try
+        {
+            var json = JsonSerializer.Deserialize<JsonElement>(response.Content);
+            var tools = json.TryGetProperty("allowed_tools", out var toolsProp)
+                ? toolsProp.EnumerateArray()
+                    .Select(t => t.GetString() ?? string.Empty)
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .ToList()
+                : new List<string>();
+
+            return new ResearchDirective
+            {
+                ShouldResearch = json.GetProperty("should_research").GetBoolean(),
+                AllowedTools = tools,
+                AllowWebSearch = json.TryGetProperty("allow_web_search", out var allowWeb) && allowWeb.GetBoolean(),
+                QueryQuality = json.TryGetProperty("query_quality", out var quality) ? quality.GetString() ?? "low" : "low",
+                RecommendedQuery = json.TryGetProperty("recommended_query", out var query) ? query.GetString() ?? string.Empty : string.Empty,
+                Reasoning = json.TryGetProperty("reasoning", out var reasoning) ? reasoning.GetString() ?? string.Empty : string.Empty
+            };
+        }
+        catch
+        {
+            return defaultDirective;
+        }
+    }
 
     private static string Truncate(string value, int maxLength)
     {

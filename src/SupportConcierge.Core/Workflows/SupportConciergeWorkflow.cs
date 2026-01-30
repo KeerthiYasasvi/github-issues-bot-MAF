@@ -51,6 +51,7 @@ public static class SupportConciergeWorkflow
         var loadSpecPack = new LoadSpecPackExecutor(specPackLoader);
         var triage = new TriageExecutor(triageAgent, criticAgent);
         var casePacket = new CasePacketExecutor(gitHubTool, casePacketAgent);
+        var researchGate = new OrchestratorResearchGateExecutor(orchestratorAgent);
         var research = new ResearchExecutor(researchAgent, criticAgent, toolRegistry);
         var response = new ResponseExecutor(responseAgent, criticAgent);
         var orchestratorEvaluate = new OrchestratorEvaluateExecutor(orchestratorAgent);
@@ -84,7 +85,8 @@ public static class SupportConciergeWorkflow
         builder.AddEdge<RunContext>(offTopic, loadSpecPack, ctx => !(ctx?.ShouldRedirectOffTopic ?? false));
         builder.AddEdge(loadSpecPack, triage);
         builder.AddEdge(triage, casePacket);
-        builder.AddEdge(casePacket, research);
+        builder.AddEdge(casePacket, researchGate);
+        builder.AddEdge(researchGate, research);
         builder.AddEdge(research, response);
         builder.AddEdge(response, orchestratorEvaluate);
 

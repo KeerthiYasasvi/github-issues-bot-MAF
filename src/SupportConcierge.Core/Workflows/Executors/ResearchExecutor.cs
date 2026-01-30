@@ -27,9 +27,56 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         Console.WriteLine("[MAF] Research: Starting tool selection and investigation");
 
         var triageResult = input.TriageResult ?? new TriageResult();
+        var directive = input.ResearchDirective;
+        if (directive != null && !directive.ShouldResearch)
+        {
+            Console.WriteLine("[MAF] Research: Skipping research per orchestrator directive.");
+            input.InvestigationResult = new InvestigationResult
+            {
+                ToolsUsed = new List<string>(),
+                Findings = new List<Finding>
+                {
+                    new()
+                    {
+                        FindingType = "policy",
+                        Content = $"Research skipped: {directive.Reasoning}",
+                        Source = "orchestrator",
+                        Confidence = 0.8m
+                    }
+                },
+                InvestigationDepth = "shallow",
+                NextStepsRecommended = new List<string>()
+            };
+            return input;
+        }
 
         // Select tools
         var selectedTools = await _researchAgent.SelectToolsAsync(input, triageResult, ct);
+        if (directive != null && directive.AllowedTools.Count > 0)
+        {
+            var allowed = new HashSet<string>(directive.AllowedTools, StringComparer.OrdinalIgnoreCase);
+            selectedTools.SelectedTools = selectedTools.SelectedTools
+                .Where(t => allowed.Contains(t.ToolName))
+                .ToList();
+        }
+
+        if (directive != null && !directive.AllowWebSearch)
+        {
+            selectedTools.SelectedTools = selectedTools.SelectedTools
+                .Where(t => !t.ToolName.Equals("WebSearchTool", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        if (directive != null && !string.IsNullOrWhiteSpace(directive.RecommendedQuery))
+        {
+            foreach (var tool in selectedTools.SelectedTools)
+            {
+                if (!tool.QueryParameters.ContainsKey("query"))
+                {
+                    tool.QueryParameters["query"] = directive.RecommendedQuery;
+                }
+            }
+        }
         input.SelectedTools = selectedTools.SelectedTools.ToList();
         Console.WriteLine($"[MAF] Research: Selected {selectedTools.SelectedTools.Count} tools");
         if (selectedTools.SelectedTools.Count > 0)

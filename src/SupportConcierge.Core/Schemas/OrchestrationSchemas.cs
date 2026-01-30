@@ -331,6 +331,39 @@ public static class OrchestrationSchemas
     }
 
     /// <summary>
+    /// Schema for orchestrator-driven research gating
+    /// </summary>
+    public static string GetResearchDirectiveSchema()
+    {
+        return JsonSerializer.Serialize(new
+        {
+            type = "object",
+            properties = new
+            {
+                should_research = new { type = "boolean" },
+                allowed_tools = new
+                {
+                    type = "array",
+                    items = new { type = "string" }
+                },
+                allow_web_search = new { type = "boolean" },
+                query_quality = new { type = "string", @enum = new[] { "low", "medium", "high" } },
+                recommended_query = new { type = "string" },
+                reasoning = new { type = "string" }
+            },
+            required = new[]
+            {
+                "should_research",
+                "allowed_tools",
+                "allow_web_search",
+                "query_quality",
+                "recommended_query",
+                "reasoning"
+            }
+        });
+    }
+
+    /// <summary>
     /// Schema for information sufficiency check
     /// </summary>
     public static string GetInfoSufficiencySchema()
