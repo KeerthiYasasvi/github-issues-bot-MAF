@@ -1,7 +1,7 @@
 using System.Text.Json;
-using SupportConcierge.Core.Evals;
-using SupportConcierge.Core.Models;
-using SupportConcierge.Core.Tools;
+using SupportConcierge.Core.Modules.Evals;
+using SupportConcierge.Core.Modules.Models;
+using SupportConcierge.Core.Modules.Tools;
 
 namespace SupportConcierge.Tests;
 
@@ -146,3 +146,4 @@ public sealed class EvalTests
         Assert.True(issues.Count >= 1);
     }
 }
+

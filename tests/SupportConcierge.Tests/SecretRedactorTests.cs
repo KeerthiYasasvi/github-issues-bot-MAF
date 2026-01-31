@@ -1,4 +1,4 @@
-using SupportConcierge.Core.Guardrails;
+using SupportConcierge.Core.Modules.Guardrails;
 using Xunit;
 
 namespace SupportConcierge.Tests;
@@ -18,3 +18,4 @@ public class SecretRedactorTests
         Assert.NotEmpty(findings);
     }
 }
+

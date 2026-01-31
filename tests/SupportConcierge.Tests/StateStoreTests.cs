@@ -1,5 +1,5 @@
-using SupportConcierge.Core.Models;
-using SupportConcierge.Core.Tools;
+using SupportConcierge.Core.Modules.Models;
+using SupportConcierge.Core.Modules.Tools;
 using Xunit;
 
 namespace SupportConcierge.Tests;
@@ -93,3 +93,4 @@ public class StateStoreTests
         Assert.Equal("field_10", pruned.UserConversations["alice"].AskedFields.First());
     }
 }
+

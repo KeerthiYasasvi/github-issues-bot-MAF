@@ -20,7 +20,7 @@ ParseEvent -> LoadSpecPack -> LoadPriorState -> ApplyGuardrails -> ExtractCasePa
   -> LoopsExhausted: Escalate -> PersistState
 ```
 
-More details: `docs/ARCHITECTURE.md`
+More details: `docs/architecture/ARCHITECTURE.md`
 
 ## Quick start
 
@@ -117,7 +117,7 @@ For deploying the bot in its own repository:
 - `SUPPORTBOT_WRITE_MODE` (repo variable, true/false)
 
 2) Add the runtime workflow
-- Copy `.github/workflows/supportbot.yml` into your repo, or use the reusable workflow described in `docs/DEPLOYMENT.md`.
+- Copy `.github/workflows/supportbot.yml` into your repo, or use the reusable workflow described in `docs/deployment/DEPLOYMENT.md`.
 
 3) Optional spec pack override
 - Defaults to `.supportbot`. Set `SUPPORTBOT_SPEC_DIR` to point elsewhere.
@@ -159,7 +159,7 @@ More details: `evals/README.md`
 
 ## Repo layout
 
-- `src/SupportConcierge.Core` - workflow, agents, tools, models (MAF DAG)
+- `src/SupportConcierge.Core/Modules` - workflow, agents, tools, models (MAF DAG)
 - `src/SupportConcierge.Cli` - runtime entrypoint (MAF workflow execution)
 - `evals/` - fixtures and reports
 - `tests/` - deterministic plumbing tests
@@ -191,3 +191,4 @@ var run = await InProcessExecution.RunAsync(workflow, eventInput);
 ## License
 
 MIT (replace as needed)
+

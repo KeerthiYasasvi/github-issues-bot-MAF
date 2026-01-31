@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using SupportConcierge.Core.Agents;
+using SupportConcierge.Core.Modules.Agents;
 
 namespace SupportConcierge.Cli.Evals;
 
@@ -443,3 +443,4 @@ public sealed class HeuristicLlmClient : ILlmClient
         };
     }
 }
+

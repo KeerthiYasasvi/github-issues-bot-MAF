@@ -1,13 +1,13 @@
 using System.Text.Json;
 using Microsoft.Agents.AI.Workflows;
-using SupportConcierge.Core.Agents;
-using SupportConcierge.Core.Evals;
-using FollowUpQuestionModel = SupportConcierge.Core.Models.FollowUpQuestion;
-using FollowUpQuestionAgent = SupportConcierge.Core.Agents.FollowUpQuestion;
-using SupportConcierge.Core.Models;
-using SupportConcierge.Core.SpecPack;
-using SupportConcierge.Core.Tools;
-using SupportConcierge.Core.Workflows;
+using SupportConcierge.Core.Modules.Agents;
+using SupportConcierge.Core.Modules.Evals;
+using FollowUpQuestionModel = SupportConcierge.Core.Modules.Models.FollowUpQuestion;
+using FollowUpQuestionAgent = SupportConcierge.Core.Modules.Agents.FollowUpQuestion;
+using SupportConcierge.Core.Modules.Models;
+using SupportConcierge.Core.Modules.SpecPack;
+using SupportConcierge.Core.Modules.Tools;
+using SupportConcierge.Core.Modules.Workflows;
 
 namespace SupportConcierge.Cli.Evals;
 
@@ -154,8 +154,8 @@ public sealed class EvalRunner
 
         var orchestrator = new OrchestratorAgent(llmClient, schemaValidator);
         var evalDir = _outputDir;
-        var evalSink = new SupportConcierge.Core.Evals.JsonlEvalSink(evalDir);
-        var critic = new CriticAgent(llmClient, schemaValidator, new SupportConcierge.Core.Evals.RubricLoader(), evalSink);
+        var evalSink = new SupportConcierge.Core.Modules.Evals.JsonlEvalSink(evalDir);
+        var critic = new CriticAgent(llmClient, schemaValidator, new SupportConcierge.Core.Modules.Evals.RubricLoader(), evalSink);
         var triageAgent = new EnhancedTriageAgent(llmClient, schemaValidator);
         var researchAgent = new EnhancedResearchAgent(llmClient, schemaValidator);
         var responseAgent = new EnhancedResponseAgent(llmClient, schemaValidator);
@@ -872,3 +872,4 @@ public sealed class EvalRunner
         return null;
     }
 }
+

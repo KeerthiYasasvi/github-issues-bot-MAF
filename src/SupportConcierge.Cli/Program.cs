@@ -1,12 +1,12 @@
 using System.Text.Json;
 using Microsoft.Agents.AI.Workflows;
-using SupportConcierge.Core.Agents;
-using SupportConcierge.Core.Evals;
-using SupportConcierge.Core.Guardrails;
-using SupportConcierge.Core.Models;
-using SupportConcierge.Core.SpecPack;
-using SupportConcierge.Core.Tools;
-using SupportConcierge.Core.Workflows;
+using SupportConcierge.Core.Modules.Agents;
+using SupportConcierge.Core.Modules.Evals;
+using SupportConcierge.Core.Modules.Guardrails;
+using SupportConcierge.Core.Modules.Models;
+using SupportConcierge.Core.Modules.SpecPack;
+using SupportConcierge.Core.Modules.Tools;
+using SupportConcierge.Core.Modules.Workflows;
 
 namespace SupportConcierge.Cli;
 
@@ -248,15 +248,15 @@ public static class Program
 
         if (context.FollowUpQuestions.Count == 0)
         {
-            context.FollowUpQuestions.Add(new SupportConcierge.Core.Models.FollowUpQuestion
+            context.FollowUpQuestions.Add(new SupportConcierge.Core.Modules.Models.FollowUpQuestion
             {
                 Question = "Please share the exact error message and any relevant logs or stack traces."
             });
-            context.FollowUpQuestions.Add(new SupportConcierge.Core.Models.FollowUpQuestion
+            context.FollowUpQuestions.Add(new SupportConcierge.Core.Modules.Models.FollowUpQuestion
             {
                 Question = "What OS and runtime/build tool versions are you using?"
             });
-            context.FollowUpQuestions.Add(new SupportConcierge.Core.Models.FollowUpQuestion
+            context.FollowUpQuestions.Add(new SupportConcierge.Core.Modules.Models.FollowUpQuestion
             {
                 Question = "What steps lead to the failure?"
             });
@@ -500,3 +500,4 @@ public static class Program
         public Dictionary<string, string> DecisionPath { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }
+

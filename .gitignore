@@ -32,19 +32,4 @@ state.json
 # Local test fixtures
 test-event.json
 
-# Documentation
-docs/
-*.md
-!README.md
-# Allow prompt templates
-!prompts/
-!prompts/**/*.md
-
-# Developer reference documentation (personal use only)
-IMPLEMENTATION_SUMMARY.md
-BOT_ACCOUNT_CONFIGURATION.md
-QUICK_REFERENCE.md
-PREVIOUS_PROJECT_ANALYSIS.md
-BUG_REPORT.md
-FIX_SUMMARY.md
-DETAILED_INVESTIGATION_REPORT.md
+## Documentation is tracked in git (see /docs and root markdown files).
