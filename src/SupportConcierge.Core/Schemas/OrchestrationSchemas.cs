@@ -445,4 +445,39 @@ public static class OrchestrationSchemas
 
         return JsonSerializer.Serialize(schema);
     }
+
+    /// <summary>
+    /// Schema for Judge/Critique evaluations (structured Judgement)
+    /// </summary>
+    public static string GetJudgeResultSchema()
+    {
+        var schema = new
+        {
+            type = "object",
+            properties = new
+            {
+                subscores = new
+                {
+                    type = "object",
+                    additionalProperties = new { type = "number" },
+                    description = "Rubric subscores keyed by rubric item id"
+                },
+                issues = new
+                {
+                    type = "array",
+                    items = new { type = "string" },
+                    description = "Issues found by the judge"
+                },
+                suggestions = new
+                {
+                    type = "array",
+                    items = new { type = "string" },
+                    description = "Fix suggestions"
+                }
+            },
+            required = new[] { "subscores", "issues", "suggestions" }
+        };
+
+        return JsonSerializer.Serialize(schema);
+    }
 }

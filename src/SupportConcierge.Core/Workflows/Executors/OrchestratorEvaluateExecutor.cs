@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Agents.AI.Workflows;
 using SupportConcierge.Core.Agents;
 using SupportConcierge.Core.Models;
@@ -10,11 +11,13 @@ namespace SupportConcierge.Core.Workflows.Executors;
 public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunContext>
 {
     private readonly OrchestratorAgent _orchestrator;
+    private readonly CriticAgent _critic;
 
-    public OrchestratorEvaluateExecutor(OrchestratorAgent orchestrator)
+    public OrchestratorEvaluateExecutor(OrchestratorAgent orchestrator, CriticAgent critic)
         : base("orchestrator_evaluate", ExecutorDefaults.Options, false)
     {
         _orchestrator = orchestrator;
+        _critic = critic;
     }
 
     public override async ValueTask<RunContext> HandleAsync(RunContext input, IWorkflowContext context, CancellationToken ct = default)
@@ -63,6 +66,18 @@ public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunConte
 
         Console.WriteLine($"[MAF] Orchestrator: Decision = {decision.Action} (confidence: {decision.ConfidenceScore:F2})");
         Console.WriteLine($"[MAF] Orchestrator: Reasoning - {decision.Reasoning}");
+
+        var evalContext = new SupportConcierge.Core.Evals.EvalContext
+        {
+            RunId = $"{input.Repository?.FullName}#{input.Issue?.Number}:{input.ActiveParticipant}:{DateTime.UtcNow:yyyyMMddHHmmss}",
+            PhaseId = "orchestrator",
+            AgentName = "Orchestrator",
+            InputText = JsonSerializer.Serialize(input.Plan ?? new OrchestratorPlan()),
+            OutputText = JsonSerializer.Serialize(decision),
+            StartedAt = DateTimeOffset.UtcNow,
+            EndedAt = DateTimeOffset.UtcNow
+        };
+        _ = await _critic.EvaluateAsync("Orchestrator", "orchestrator", evalContext, ct);
 
         // CRITICAL: Clear all decision flags first to ensure only ONE is set
         // This prevents duplicate comments from multiple workflow edges firing

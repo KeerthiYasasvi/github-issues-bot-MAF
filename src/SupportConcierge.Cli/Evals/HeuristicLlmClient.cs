@@ -20,6 +20,7 @@ public sealed class HeuristicLlmClient : ILlmClient
             "ResearchResult" => BuildResearch(prompt),
             "ResponseGeneration" => BuildResponse(prompt),
             "CritiqueResult" => BuildCritique(prompt),
+            "JudgeResult" => BuildJudge(prompt),
             "OrchestratorPlan" => BuildPlan(prompt),
             "InfoSufficiency" => BuildSufficiency(prompt),
             "OffTopicDecision" => BuildOffTopic(prompt),
@@ -143,6 +144,21 @@ public sealed class HeuristicLlmClient : ILlmClient
                 : Array.Empty<object>(),
             suggestions = shouldFail ? new[] { "Refine output to address missing details" } : Array.Empty<string>(),
             is_passable = !shouldFail
+        };
+        return JsonSerializer.Serialize(json);
+    }
+
+    private static string BuildJudge(string prompt)
+    {
+        var json = new
+        {
+            subscores = new Dictionary<string, double>
+            {
+                ["clarity"] = 4,
+                ["quality"] = 4
+            },
+            issues = Array.Empty<string>(),
+            suggestions = Array.Empty<string>()
         };
         return JsonSerializer.Serialize(json);
     }

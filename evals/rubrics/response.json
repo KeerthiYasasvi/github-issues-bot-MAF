@@ -1,0 +1,28 @@
+{
+  "rubricId": "response-v1",
+  "agentName": "Response",
+  "thresholdScore": 7,
+  "items": [
+    {
+      "id": "secret_request_ban",
+      "description": "Do not ask for secrets or tokens.",
+      "maxPoints": 3,
+      "type": "rule",
+      "ruleId": "secret_request_ban"
+    },
+    {
+      "id": "question_mapping",
+      "description": "Follow-up questions map to missing fields.",
+      "maxPoints": 2,
+      "type": "rule",
+      "ruleId": "question_mapping"
+    },
+    {
+      "id": "response_quality",
+      "description": "Response is clear, actionable, and polite.",
+      "maxPoints": 5,
+      "type": "judge",
+      "instructions": "Assess clarity, actionability, and tone."
+    }
+  ]
+}

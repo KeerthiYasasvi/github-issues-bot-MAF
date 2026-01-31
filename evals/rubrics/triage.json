@@ -1,0 +1,28 @@
+{
+  "rubricId": "triage-v1",
+  "agentName": "Triage",
+  "thresholdScore": 7,
+  "items": [
+    {
+      "id": "no_hallucinated_versions",
+      "description": "Avoid asserting versions/env data not present in input.",
+      "maxPoints": 3,
+      "type": "rule",
+      "ruleId": "no_hallucinated_versions"
+    },
+    {
+      "id": "schema_valid",
+      "description": "Structured output should be valid when schema is expected.",
+      "maxPoints": 2,
+      "type": "rule",
+      "ruleId": "schema_valid"
+    },
+    {
+      "id": "clarity",
+      "description": "Clear classification and extracted details.",
+      "maxPoints": 5,
+      "type": "judge",
+      "instructions": "Assess clarity and correctness of triage and extracted details."
+    }
+  ]
+}

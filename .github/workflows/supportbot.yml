@@ -53,3 +53,10 @@ jobs:
         with:
           name: supportbot-telemetry
           path: artifacts/telemetry
+
+      - name: Upload evals
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supportbot-evals
+          path: artifacts/evals

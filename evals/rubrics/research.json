@@ -1,0 +1,28 @@
+{
+  "rubricId": "research-v1",
+  "agentName": "Research",
+  "thresholdScore": 7,
+  "items": [
+    {
+      "id": "tool_allowlist",
+      "description": "Only use allow-listed tools.",
+      "maxPoints": 3,
+      "type": "rule",
+      "ruleId": "tool_allowlist"
+    },
+    {
+      "id": "no_hallucinated_versions",
+      "description": "Avoid asserting versions/env data not present in input.",
+      "maxPoints": 2,
+      "type": "rule",
+      "ruleId": "no_hallucinated_versions"
+    },
+    {
+      "id": "research_quality",
+      "description": "Findings are plausible and tied to evidence.",
+      "maxPoints": 5,
+      "type": "judge",
+      "instructions": "Check plausibility, evidence linkage, and relevance of findings."
+    }
+  ]
+}

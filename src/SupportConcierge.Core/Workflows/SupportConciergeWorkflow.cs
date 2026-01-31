@@ -55,7 +55,7 @@ public static class SupportConciergeWorkflow
         var researchGate = new OrchestratorResearchGateExecutor(orchestratorAgent);
         var research = new ResearchExecutor(researchAgent, criticAgent, toolRegistry);
         var response = new ResponseExecutor(responseAgent, criticAgent);
-        var orchestratorEvaluate = new OrchestratorEvaluateExecutor(orchestratorAgent);
+        var orchestratorEvaluate = new OrchestratorEvaluateExecutor(orchestratorAgent, criticAgent);
         var postComment = new PostCommentExecutor(gitHubTool);
         var persistState = new PersistStateExecutor();
 

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Agents.AI.Workflows;
 using SupportConcierge.Core.Agents;
+using SupportConcierge.Core.Evals;
 using SupportConcierge.Core.Guardrails;
 using SupportConcierge.Core.Models;
 using SupportConcierge.Core.SpecPack;
@@ -61,10 +62,13 @@ public static class Program
         ILlmClient criticLlmClient = CreateLlmClient(metrics, modelOverride: Environment.GetEnvironmentVariable("OPENAI_CRITIQUE_MODEL"));  // OPENAI_CRITIQUE_MODEL (optional)
 
         var schemaValidator = new SchemaValidator();
+        var evalDir = Environment.GetEnvironmentVariable("SUPPORTBOT_EVALS_DIR") ?? "artifacts/evals";
+        var evalSink = new JsonlEvalSink(evalDir);
+        var rubricLoader = new RubricLoader();
 
         // Initialize new agentic system
         var orchestrator = new OrchestratorAgent(agentLlmClient, schemaValidator);
-        var critic = new CriticAgent(criticLlmClient, schemaValidator);
+        var critic = new CriticAgent(criticLlmClient, schemaValidator, rubricLoader, evalSink);
         var triageAgent = new EnhancedTriageAgent(agentLlmClient, schemaValidator);
         var researchAgent = new EnhancedResearchAgent(agentLlmClient, schemaValidator);
         var responseAgent = new EnhancedResponseAgent(agentLlmClient, schemaValidator);
@@ -123,6 +127,9 @@ public static class Program
 
         await WriteMetricsAsync(metrics);
         await WriteTelemetryAsync(resultContext, metricsRecord);
+
+        var aggregator = new AgentEvalAggregator();
+        aggregator.GenerateReports(evalDir);
 
         return 0;
     }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Agents.AI.Workflows;
 using SupportConcierge.Core.Agents;
+using SupportConcierge.Core.Evals;
 using FollowUpQuestionModel = SupportConcierge.Core.Models.FollowUpQuestion;
 using FollowUpQuestionAgent = SupportConcierge.Core.Agents.FollowUpQuestion;
 using SupportConcierge.Core.Models;
@@ -17,6 +18,7 @@ public sealed class EvalRunner
         PropertyNameCaseInsensitive = true,
         ReadCommentHandling = JsonCommentHandling.Skip
     };
+    private string _outputDir = "artifacts/evals";
 
     public async Task<int> RunAllAsync(
         string scenariosDir,
@@ -24,6 +26,7 @@ public sealed class EvalRunner
         string? subsetTag = null,
         bool useLiveLlm = false)
     {
+        _outputDir = outputDir;
         var config = LoadEvalConfig(Path.Combine("evals", "eval_config.json"));
         var scenarios = LoadEvalScenarios(scenariosDir, subsetTag);
         var followupScenarios = LoadFollowupScenarios(Path.Combine(scenariosDir, "followups"));
@@ -150,7 +153,9 @@ public sealed class EvalRunner
         var schemaValidator = new SchemaValidator();
 
         var orchestrator = new OrchestratorAgent(llmClient, schemaValidator);
-        var critic = new CriticAgent(llmClient, schemaValidator);
+        var evalDir = _outputDir;
+        var evalSink = new SupportConcierge.Core.Evals.JsonlEvalSink(evalDir);
+        var critic = new CriticAgent(llmClient, schemaValidator, new SupportConcierge.Core.Evals.RubricLoader(), evalSink);
         var triageAgent = new EnhancedTriageAgent(llmClient, schemaValidator);
         var researchAgent = new EnhancedResearchAgent(llmClient, schemaValidator);
         var responseAgent = new EnhancedResponseAgent(llmClient, schemaValidator);

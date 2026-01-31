@@ -1,0 +1,14 @@
+{
+  "rubricId": "critique-v1",
+  "agentName": "Critique",
+  "thresholdScore": 7,
+  "items": [
+    {
+      "id": "nonempty_issues",
+      "description": "Critique provides at least one issue or explicit confirmation.",
+      "maxPoints": 7,
+      "type": "rule",
+      "ruleId": "nonempty_issues"
+    }
+  ]
+}
