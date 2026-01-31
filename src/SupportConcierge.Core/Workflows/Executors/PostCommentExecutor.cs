@@ -286,6 +286,16 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             sb.AppendLine("- A maintainer will review your issue shortly");
             sb.AppendLine("- If you have additional details, please share them in a comment below");
             sb.AppendLine("- Use `/diagnose` to restart fresh analysis if needed");
+
+            var escalationSummary = BuildEscalationSummary(input);
+            if (!string.IsNullOrWhiteSpace(escalationSummary))
+            {
+                sb.AppendLine();
+                sb.AppendLine("---");
+                sb.AppendLine();
+                sb.AppendLine("**Escalation summary:**");
+                sb.AppendLine(escalationSummary);
+            }
             
             return sb.ToString().Trim();
         }
@@ -321,6 +331,16 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             sb.AppendLine();
             sb.AppendLine("This issue has been analyzed and categorized. Please let me know if this assessment is correct or if you'd like me to reconsider.");
 
+            var escalationSummary = BuildEscalationSummary(input);
+            if (!string.IsNullOrWhiteSpace(escalationSummary))
+            {
+                sb.AppendLine();
+                sb.AppendLine("---");
+                sb.AppendLine();
+                sb.AppendLine("**Collected info & gaps:**");
+                sb.AppendLine(escalationSummary);
+            }
+
             return sb.ToString().Trim();
         }
 
@@ -347,5 +367,57 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
         }
 
         return string.Empty;
+    }
+
+    private static string BuildEscalationSummary(RunContext input)
+    {
+        var sb = new StringBuilder();
+
+        var collected = new List<string>();
+        if (input.TriageResult?.ExtractedDetails?.Count > 0)
+        {
+            collected.AddRange(input.TriageResult.ExtractedDetails
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+                .Take(6)
+                .Select(kv => $"{kv.Key}: {kv.Value}"));
+        }
+
+        if (input.CasePacket?.Fields?.Count > 0)
+        {
+            collected.AddRange(input.CasePacket.Fields
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+                .Take(6)
+                .Select(kv => $"{kv.Key}: {kv.Value}"));
+        }
+
+        if (collected.Count > 0)
+        {
+            sb.AppendLine("**Collected details:**");
+            foreach (var item in collected.Distinct(StringComparer.OrdinalIgnoreCase).Take(8))
+            {
+                sb.AppendLine($"- {item}");
+            }
+        }
+
+        var missing = input.Scoring?.MissingFields
+            ?.Where(m => !string.IsNullOrWhiteSpace(m))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToList() ?? new List<string>();
+
+        if (missing.Count > 0)
+        {
+            if (sb.Length > 0)
+            {
+                sb.AppendLine();
+            }
+            sb.AppendLine("**Missing info:**");
+            foreach (var item in missing)
+            {
+                sb.AppendLine($"- {item}");
+            }
+        }
+
+        return sb.ToString().Trim();
     }
 }
