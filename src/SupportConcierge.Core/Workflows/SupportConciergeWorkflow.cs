@@ -50,6 +50,7 @@ public static class SupportConciergeWorkflow
         var offTopic = new OffTopicCheckExecutor(offTopicAgent);
         var loadSpecPack = new LoadSpecPackExecutor(specPackLoader);
         var triage = new TriageExecutor(triageAgent, criticAgent);
+        var addLabels = new AddLabelsExecutor(gitHubTool);
         var casePacket = new CasePacketExecutor(gitHubTool, casePacketAgent);
         var researchGate = new OrchestratorResearchGateExecutor(orchestratorAgent);
         var research = new ResearchExecutor(researchAgent, criticAgent, toolRegistry);
@@ -65,6 +66,7 @@ public static class SupportConciergeWorkflow
             .BindExecutor(offTopic)
             .BindExecutor(loadSpecPack)
             .BindExecutor(triage)
+            .BindExecutor(addLabels)
             .BindExecutor(casePacket)
             .BindExecutor(researchGate)
             .BindExecutor(research)
@@ -85,7 +87,8 @@ public static class SupportConciergeWorkflow
         builder.AddEdge<RunContext>(offTopic, postComment, ctx => ctx?.ShouldRedirectOffTopic ?? false);
         builder.AddEdge<RunContext>(offTopic, loadSpecPack, ctx => !(ctx?.ShouldRedirectOffTopic ?? false));
         builder.AddEdge(loadSpecPack, triage);
-        builder.AddEdge(triage, casePacket);
+        builder.AddEdge(triage, addLabels);
+        builder.AddEdge(addLabels, casePacket);
         builder.AddEdge(casePacket, researchGate);
         builder.AddEdge(researchGate, research);
         builder.AddEdge(research, response);

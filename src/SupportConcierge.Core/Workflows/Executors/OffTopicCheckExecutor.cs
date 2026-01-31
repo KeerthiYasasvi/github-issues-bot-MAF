@@ -1,6 +1,7 @@
 using Microsoft.Agents.AI.Workflows;
 using SupportConcierge.Core.Agents;
 using SupportConcierge.Core.Models;
+using System.Text.RegularExpressions;
 
 namespace SupportConcierge.Core.Workflows.Executors;
 
@@ -25,14 +26,30 @@ public sealed class OffTopicCheckExecutor : Executor<RunContext, RunContext>
             return input;
         }
 
-        if (input.EventName != "issue_comment" || input.IncomingComment == null)
+        var isIssueComment = input.EventName == "issue_comment";
+        var isIssueEvent = input.EventName == "issues";
+        if (!isIssueComment && !isIssueEvent)
         {
             return input;
         }
 
-        if (input.IsDiagnoseCommand || input.IsStopCommand)
+        if (isIssueComment && input.IncomingComment == null)
         {
             return input;
+        }
+
+        if (input.IsStopCommand)
+        {
+            return input;
+        }
+
+        if (input.IsDiagnoseCommand && isIssueComment)
+        {
+            var remaining = StripCommands(input.IncomingComment.Body ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(remaining))
+            {
+                return input;
+            }
         }
 
         Console.WriteLine("[MAF] OffTopic: Evaluating comment relevance to issue thread");
@@ -48,6 +65,17 @@ public sealed class OffTopicCheckExecutor : Executor<RunContext, RunContext>
             {
                 input.ExecutionState.LoopActionTaken = "off_topic_redirect";
             }
+            var activeConv = input.ActiveUserConversation;
+            if (activeConv != null)
+            {
+                activeConv.OffTopicStrikeCount += 1;
+                if (activeConv.OffTopicStrikeCount >= 2)
+                {
+                    activeConv.IsOffTopicBlocked = true;
+                    activeConv.OffTopicBlockedAt = DateTime.UtcNow;
+                }
+                Console.WriteLine($"[MAF] OffTopic: {input.ActiveParticipant} strike {activeConv.OffTopicStrikeCount}/2");
+            }
             Console.WriteLine($"[MAF] OffTopic: Detected off-topic comment (confidence {assessment.ConfidenceScore:0.00}).");
         }
         else
@@ -57,5 +85,16 @@ public sealed class OffTopicCheckExecutor : Executor<RunContext, RunContext>
         }
 
         return input;
+    }
+
+    private static string StripCommands(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var stripped = Regex.Replace(text, @"(?i)\B/(diagnose|stop)\b", string.Empty);
+        return stripped.Trim();
     }
 }

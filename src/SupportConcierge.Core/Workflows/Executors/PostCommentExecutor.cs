@@ -117,8 +117,11 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             var issueTitle = input.Issue?.Title ?? "this issue";
             var reason = input.OffTopicAssessment.Reason;
             var suggested = input.OffTopicAssessment.SuggestedAction;
+            var isBlocked = input.ActiveUserConversation?.IsOffTopicBlocked == true;
+            var isIssueEvent = input.EventName == "issues";
+            var subject = isIssueEvent ? "issue" : "comment";
 
-            sb.AppendLine($"It looks like your comment is about something different from this thread ({issueTitle}).");
+            sb.AppendLine($"It looks like your {subject} is about something different from this thread ({issueTitle}).");
             if (!string.IsNullOrWhiteSpace(reason))
             {
                 sb.AppendLine();
@@ -134,7 +137,12 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             }
 
             sb.AppendLine();
-            sb.AppendLine("If you intended to discuss this issue, please clarify how your comment relates to the current topic.");
+            sb.AppendLine("If you intended to discuss this issue, please clarify how your content relates to the current topic.");
+            if (isBlocked)
+            {
+                sb.AppendLine();
+                sb.AppendLine("**Note:** You've gone off-topic multiple times in this thread, so I won't respond to further comments here.");
+            }
             return sb.ToString().Trim();
         }
 
@@ -152,6 +160,13 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
         // If ShouldStop but NOT IsStopCommand, it's finalized or other internal reason
         if (input.ShouldStop)
         {
+            if (input.StopReason != null && input.StopReason.Contains("diagnose reset limit", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.AppendLine("You've already used `/diagnose` once in this issue, so I can't restart the conversation again.");
+                sb.AppendLine();
+                sb.AppendLine("If you have new details, please add them to your existing thread instead.");
+                return sb.ToString().Trim();
+            }
             Console.WriteLine($"[MAF] PostComment: ShouldStop=true but no comment needed (reason: {input.StopReason})");
             return string.Empty;  // Return empty to skip posting
         }

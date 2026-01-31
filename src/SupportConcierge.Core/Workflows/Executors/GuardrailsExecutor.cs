@@ -94,6 +94,17 @@ public sealed class GuardrailsExecutor : Executor<RunContext, RunContext>
             return new ValueTask<RunContext>(input);
         }
 
+        // Off-topic spam block: after 2 off-topic strikes, ignore further comments (even /diagnose)
+        if (input.State?.UserConversations != null &&
+            input.State.UserConversations.TryGetValue(input.ActiveParticipant, out var offTopicConv) &&
+            (offTopicConv.IsOffTopicBlocked || offTopicConv.OffTopicStrikeCount >= 2))
+        {
+            Console.WriteLine($"[MAF] Guardrails: {input.ActiveParticipant} is off-topic blocked (strikes={offTopicConv.OffTopicStrikeCount}). Ignoring.");
+            input.ShouldStop = true;
+            input.StopReason = $"{input.ActiveParticipant} off-topic blocked";
+            return new ValueTask<RunContext>(input);
+        }
+
         if (commandInfo.HasStopCommand)
         {
             input.IsStopCommand = true;

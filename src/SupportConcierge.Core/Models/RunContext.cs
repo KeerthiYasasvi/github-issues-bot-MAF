@@ -16,6 +16,10 @@ public sealed class UserConversation
     public CasePacket CasePacket { get; set; } = new();
     public bool IsFinalized { get; set; }
     public DateTime? FinalizedAt { get; set; }
+    public int OffTopicStrikeCount { get; set; }
+    public bool IsOffTopicBlocked { get; set; }
+    public DateTime? OffTopicBlockedAt { get; set; }
+    public int DiagnoseResetCount { get; set; }
 }
 
 /// <summary>

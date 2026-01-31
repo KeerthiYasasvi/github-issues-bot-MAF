@@ -16,18 +16,31 @@ public sealed class OffTopicAgent
 
     public async Task<OffTopicAssessment> EvaluateAsync(RunContext context, CancellationToken cancellationToken = default)
     {
-        if (context.EventName != "issue_comment" || context.IncomingComment == null)
+        var isIssueComment = context.EventName == "issue_comment";
+        var isIssueEvent = context.EventName == "issues";
+        if (!isIssueComment && !isIssueEvent)
         {
             return new OffTopicAssessment
             {
                 OffTopic = false,
                 ConfidenceScore = 0,
-                Reason = "Not an issue comment event",
+                Reason = "Unsupported event type",
                 SuggestedAction = "continue"
             };
         }
 
-        if (context.IsDiagnoseCommand || context.IsStopCommand)
+        if (isIssueComment && (context.IncomingComment == null))
+        {
+            return new OffTopicAssessment
+            {
+                OffTopic = false,
+                ConfidenceScore = 0,
+                Reason = "Missing issue comment",
+                SuggestedAction = "continue"
+            };
+        }
+
+        if (isIssueComment && (context.IsDiagnoseCommand || context.IsStopCommand))
         {
             return new OffTopicAssessment
             {
@@ -38,6 +51,13 @@ public sealed class OffTopicAgent
             };
         }
 
+        var commentAuthor = isIssueComment
+            ? (context.IncomingComment?.User?.Login ?? string.Empty)
+            : (context.Issue.User?.Login ?? string.Empty);
+        var commentBody = isIssueComment
+            ? (context.IncomingComment?.Body ?? string.Empty)
+            : (context.Issue.Body ?? string.Empty);
+
         var schema = OrchestrationSchemas.GetOffTopicSchema();
         var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
             "offtopic-check.md",
@@ -46,8 +66,8 @@ public sealed class OffTopicAgent
                 ["ISSUE_TITLE"] = context.Issue.Title ?? string.Empty,
                 ["ISSUE_BODY"] = context.Issue.Body ?? string.Empty,
                 ["ISSUE_AUTHOR"] = context.Issue.User?.Login ?? string.Empty,
-                ["COMMENT_AUTHOR"] = context.IncomingComment.User?.Login ?? string.Empty,
-                ["COMMENT_BODY"] = context.IncomingComment.Body ?? string.Empty,
+                ["COMMENT_AUTHOR"] = commentAuthor,
+                ["COMMENT_BODY"] = commentBody,
                 ["STATE_CATEGORY"] = context.State?.Category ?? string.Empty
             },
             cancellationToken);

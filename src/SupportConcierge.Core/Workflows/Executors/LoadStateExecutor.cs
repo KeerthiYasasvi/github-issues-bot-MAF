@@ -130,18 +130,45 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
                 // Check if this is a /diagnose command - create new conversation
                 if (input.IsDiagnoseCommand)
                 {
-                    Console.WriteLine($"[MAF] LoadState: /diagnose detected - creating new conversation for {activeUser}");
-                    var newConv = new UserConversation
+                    if (loadedState.UserConversations.TryGetValue(activeUser, out var existingConv))
                     {
-                        Username = activeUser,
-                        LoopCount = 0,
-                        IsExhausted = false,
-                        FirstInteraction = DateTime.UtcNow,
-                        LastInteraction = DateTime.UtcNow
-                    };
-                    loadedState.UserConversations[activeUser] = newConv;
-                    input.ActiveUserConversation = newConv;
-                    Console.WriteLine($"[MAF] LoadState: Created NEW conversation for {activeUser} with LoopCount=0 (will increment to 1)");
+                        if (existingConv.IsOffTopicBlocked)
+                        {
+                            Console.WriteLine($"[MAF] LoadState: /diagnose detected but {activeUser} is off-topic blocked; keeping existing conversation");
+                            input.ActiveUserConversation = existingConv;
+                        }
+                        else if (existingConv.DiagnoseResetCount >= 1)
+                        {
+                            Console.WriteLine($"[MAF] LoadState: /diagnose limit reached for {activeUser}; ignoring reset");
+                            input.ActiveUserConversation = existingConv;
+                            input.ShouldStop = true;
+                            input.StopReason = $"{activeUser} diagnose reset limit reached";
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[MAF] LoadState: /diagnose detected - resetting conversation for {activeUser}");
+                            existingConv.DiagnoseResetCount += 1;
+                            ResetConversationForDiagnose(existingConv);
+                            input.ActiveUserConversation = existingConv;
+                            Console.WriteLine($"[MAF] LoadState: Reset conversation for {activeUser} with LoopCount=0 (will increment to 1)");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[MAF] LoadState: /diagnose detected - creating new conversation for {activeUser}");
+                        var newConv = new UserConversation
+                        {
+                            Username = activeUser,
+                            LoopCount = 0,
+                            IsExhausted = false,
+                            FirstInteraction = DateTime.UtcNow,
+                            LastInteraction = DateTime.UtcNow,
+                            DiagnoseResetCount = 1
+                        };
+                        loadedState.UserConversations[activeUser] = newConv;
+                        input.ActiveUserConversation = newConv;
+                        Console.WriteLine($"[MAF] LoadState: Created NEW conversation for {activeUser} with LoopCount=0 (will increment to 1)");
+                    }
                 }
                 else
                 {
@@ -259,5 +286,18 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
             Console.WriteLine($"[MAF] LoadState: Migrated legacy state - {issueAuthor} Loop={legacyConv.LoopCount}");
         }
 #pragma warning restore CS0618 // Type or member is obsolete
+    }
+
+    private static void ResetConversationForDiagnose(UserConversation conversation)
+    {
+        conversation.LoopCount = 0;
+        conversation.IsExhausted = false;
+        conversation.FirstInteraction = DateTime.UtcNow;
+        conversation.LastInteraction = DateTime.UtcNow;
+        conversation.AskedFields.Clear();
+        conversation.CasePacket = new CasePacket();
+        conversation.IsFinalized = false;
+        conversation.FinalizedAt = null;
+        // Preserve OffTopicStrikeCount/IsOffTopicBlocked so /diagnose cannot bypass spam blocking.
     }
 }
