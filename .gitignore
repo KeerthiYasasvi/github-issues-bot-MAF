@@ -32,4 +32,8 @@ state.json
 # Local test fixtures
 test-event.json
 
-## Documentation is tracked in git (see /docs and root markdown files).
+# Documentation files (except prompts and README.md)
+docs/
+*.md
+!README.md
+!prompts/**/*.md

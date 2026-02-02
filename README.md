@@ -1,194 +1,203 @@
 # GitHub Issues Support Bot (MAF Workflows)
 
-A GitHub Action that triages issues and comments using Microsoft Agent Framework (MAF) style workflows in C#. It loads repo-defined Spec Packs, extracts a structured case packet deterministically first, asks targeted follow-ups (max 3 loops), and produces an engineer-ready brief with routing labels/assignees. State persists across runs via a hidden HTML comment.
+A **multi-agent AI system** built with Microsoft Agent Framework (MAF) that automatically triages GitHub issues, gathers missing information through iterative conversations, and produces actionable engineer briefs. The bot uses a coordinated team of specialized agents (Orchestrator, Triage, Research, Response, Critic) to deliver intelligent issue handling.
 
-## Why this exists
+## Key Features
 
-- Deterministic-first extraction before any LLM call
-- Schema-validated JSON outputs with repair retry
-- Guardrails for author gating, /stop, and disagreement handling
-- E2E eval suite + CI gates for quality and budget control
+- **Multi-Agent Architecture** - Orchestrator plans, specialists execute, Critic validates
+- **Deterministic-First Extraction** - Parse issue forms before any LLM call
+- **Quality Gates** - Every agent output goes through critique validation
+- **Multi-User Support** - Independent conversations per user on same issue
+- **State Persistence** - Survives stateless GitHub Actions via HTML comments
+- **Configurable Behavior** - YAML-based Spec Packs for categories, checklists, routing
+- **Comprehensive Evals** - Rubric-based evaluation framework for quality measurement
 
-## Workflow at a glance
+## How It Works
 
 ```
-ParseEvent -> LoadSpecPack -> LoadPriorState -> ApplyGuardrails -> ExtractCasePacket -> ScoreCompleteness
-  -> Stop: AcknowledgeStop -> PersistState
-  -> NeedsInfo: GenerateFollowUps -> ValidateFollowUps -> PostFollowUpComment -> PersistState
-  -> Actionable: SearchDuplicates -> FetchGroundingDocs -> GenerateEngineerBrief -> ValidateBrief
-              -> PostFinalBriefComment -> ApplyRouting -> PersistState
-  -> LoopsExhausted: Escalate -> PersistState
+┌─────────────────────────────────────────────────────────────────┐
+│                   Orchestrator Agent (Planner)                  │
+│         • Plans investigation • Evaluates progress              │
+│         • Decides: ask questions / finalize / escalate          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+    ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+    │  Triage Agent   │ │ Research Agent  │ │ Response Agent  │
+    │  • Classify     │ │ • Select tools  │ │ • Generate brief│
+    │  • Extract info │ │ • Investigate   │ │ • Follow-ups    │
+    └────────┬────────┘ └────────┬────────┘ └────────┬────────┘
+             │                   │                   │
+             └───────────────────┴───────────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │      Critic Agent       │
+                    │    • Validate outputs   │
+                    │    • Score quality      │
+                    │    • Trigger refinement │
+                    └─────────────────────────┘
 ```
 
-More details: `docs/architecture/ARCHITECTURE.md`
+### Workflow Flow
 
-## Quick start
+```
+ParseEvent → LoadState → Guardrails → OffTopicCheck → LoadSpecPack → Triage 
+    → AddLabels → CasePacket → ResearchGate → Research → Response 
+    → OrchestratorEvaluate → [Ask Questions | Finalize | Escalate] 
+    → PostComment → PersistState
+```
+
+### Loop Behavior (Per User)
+
+| Loop | Action |
+|------|--------|
+| 1 | Initial triage + targeted questions |
+| 2 | With answers, more questions or response |
+| 3 | Final response or prepare escalation |
+| 4+ | Escalate to human maintainer |
+
+## Quick Start
 
 ### Option A: Deploy as Submodule (Recommended)
 
-For test repositories that need version-controlled bot deployments:
-
-1. **Add bot as submodule to your test repo:**
-   ```bash
-   cd your-test-repo
-   git submodule add https://github.com/KeerthiYasasvi/github-issues-bot-MAF.git bot
-   git submodule update --init --recursive
-   ```
-
-2. **Create workflow file** (`.github/workflows/supportbot.yml`):
-   ```yaml
-   name: Support Concierge Bot
-   
-   on:
-     issues:
-       types: [opened, edited]
-     issue_comment:
-       types: [created]
-   
-   permissions:
-     contents: write
-     issues: write
-   
-   jobs:
-     supportbot:
-       runs-on: ubuntu-latest
-       steps:
-         - name: Checkout
-           uses: actions/checkout@v4
-           with:
-             submodules: recursive  # ← Gets pinned bot version
-   
-         - name: Setup .NET
-           uses: actions/setup-dotnet@v4
-           with:
-             dotnet-version: 8.0.x
-   
-         - name: Run Support Concierge
-           if: github.event_name == 'issues' || github.event.comment.user.login != 'github-actions[bot]'
-           run: dotnet run --project bot/src/SupportConcierge.Cli -- --event-file "$GITHUB_EVENT_PATH"
-           env:
-             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-             SUPPORTBOT_USERNAME: github-actions[bot]
-             OPENAI_API_KEY: ${{ secrets.API_KEY }}
-             OPENAI_MODEL: ${{ vars.PRIMARY_MODEL }}
-             OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL }}
-             SUPPORTBOT_DRY_RUN: ${{ vars.SUPPORTBOT_DRY_RUN || 'false' }}
-             SUPPORTBOT_WRITE_MODE: ${{ vars.SUPPORTBOT_WRITE_MODE || 'true' }}
-   
-         - name: Upload metrics
-           if: always()
-           uses: actions/upload-artifact@v4
-           with:
-             name: supportbot-metrics
-             path: artifacts/metrics
-   ```
-
-3. **Configure repo variables/secrets:**
-   - `PRIMARY_MODEL` (repo variable, e.g., "gpt-4o")
-   - `SECONDARY_MODEL` (repo variable, e.g., "gpt-4o-mini")
-   - `API_KEY` (secret, your OpenAI API key)
-   - `SUPPORTBOT_DRY_RUN` (repo variable, "true"/"false")
-   - `SUPPORTBOT_WRITE_MODE` (repo variable, "true"/"false")
-
-4. **Update bot version:**
-   ```bash
-   cd bot
-   git pull origin main
-   cd ..
-   git add bot
-   git commit -m "Update bot to [commit-sha]"
-   git push
-   ```
-
-**Why Submodules?**
-- ✅ Version locking - each test commit pins bot version
-- ✅ Reproducibility - recreate historical scenarios
-- ✅ No race conditions - submodule pointer is committed
-- ✅ Clear deployment - explicit version updates
-
-### Option B: Direct Deployment (Bot Repo Only)
-
-For deploying the bot in its own repository:
-
-1) Configure repo variables/secrets
-- `OPENAI_MODEL` (repo variable)
-- `OPENAI_API_KEY` (secret)
-- `SUPPORTBOT_DRY_RUN` (repo variable, true/false)
-- `SUPPORTBOT_WRITE_MODE` (repo variable, true/false)
-
-2) Add the runtime workflow
-- Copy `.github/workflows/supportbot.yml` into your repo, or use the reusable workflow described in `docs/deployment/DEPLOYMENT.md`.
-
-3) Optional spec pack override
-- Defaults to `.supportbot`. Set `SUPPORTBOT_SPEC_DIR` to point elsewhere.
-
-## Local run
-
-Simulate a run from a saved GitHub event JSON:
-
 ```bash
-dotnet run --project src/SupportConcierge.Cli -- --event-file path/to/event.json --dry-run
+# Add bot as submodule
+cd your-repo
+git submodule add https://github.com/your-org/github-issues-bot-MAF.git bot
+git submodule update --init --recursive
 ```
 
-Run a quick smoke workflow using the sample fixture:
+Create `.github/workflows/supportbot.yml`:
+
+```yaml
+name: Support Concierge Bot
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  supportbot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run Support Concierge
+        if: github.event_name == 'issues' || github.event.comment.user.login != 'github-actions[bot]'
+        run: dotnet run --project bot/src/SupportConcierge.Cli -- --event-file "$GITHUB_EVENT_PATH"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.API_KEY }}
+          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL }}
+          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL }}
+          SUPPORTBOT_USERNAME: github-actions[bot]
+```
+
+Configure repository:
+- **Secrets**: `API_KEY` (OpenAI API key)
+- **Variables**: `PRIMARY_MODEL` (gpt-4o), `SECONDARY_MODEL` (gpt-4o-mini)
+
+### Option B: Direct Deployment
 
 ```bash
+# Clone and configure
+git clone https://github.com/your-org/github-issues-bot-MAF.git
+cd github-issues-bot-MAF
+
+# Set environment variables
+export GITHUB_TOKEN="your-token"
+export OPENAI_API_KEY="your-key"
+export OPENAI_MODEL="gpt-4o"
+```
+
+## Local Development
+
+```bash
+# Build and test
+dotnet restore
+dotnet build
+dotnet test
+
+# Smoke test
 dotnet run --project src/SupportConcierge.Cli -- --smoke
+
+# Run with event file
+dotnet run --project src/SupportConcierge.Cli -- --event-file test-event.json --dry-run
 ```
 
-## Evals
+## Evaluations
 
-Evals are enabled and run in two modes:
-
-- **Offline deterministic** (default): uses a heuristic LLM so evals run without network access.
-- **Live LLM**: set `SUPPORTBOT_EVAL_USE_LLM=true` to run against real models.
-
-Run all evals:
+Run quality evaluations to measure agent performance:
 
 ```bash
-dotnet run --project src/SupportConcierge.Cli -- --eval --scenarios-dir evals/scenarios --output-dir artifacts/evals
+# Offline (no LLM)
+dotnet run --project src/SupportConcierge.Cli -- --eval
+
+# With LLM
+SUPPORTBOT_EVAL_USE_LLM=true dotnet run --project src/SupportConcierge.Cli -- --eval
 ```
 
-Run a CI subset only:
+Eval outputs: `artifacts/evals/eval_summary.json`
 
-```bash
-dotnet run --project src/SupportConcierge.Cli -- --eval --subset ci
+## Configuration
+
+### Spec Pack (`.supportbot/`)
+
+| File | Purpose |
+|------|---------|
+| `categories.yaml` | Issue categories and keywords |
+| `checklists.yaml` | Required fields per category |
+| `validators.yaml` | Validation rules, secret patterns |
+| `routing.yaml` | Labels and assignees per category |
+| `playbooks/*.md` | Category-specific guidance |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITHUB_TOKEN` | Yes | GitHub API token |
+| `OPENAI_API_KEY` | Yes | OpenAI API key |
+| `OPENAI_MODEL` | Yes | Primary model (e.g., gpt-4o) |
+| `OPENAI_CRITIQUE_MODEL` | No | Critic model (default: primary) |
+| `SUPPORTBOT_DRY_RUN` | No | Don't post to GitHub |
+| `SUPPORTBOT_WRITE_MODE` | No | Enable posting |
+
+## User Commands
+
+| Command | Effect |
+|---------|--------|
+| `/stop` | Opt out of conversation |
+| `/diagnose` | Join conversation or restart |
+
+## Repository Structure
+
+```
+├── src/
+│   ├── SupportConcierge.Core/     # Core bot logic
+│   │   └── Modules/
+│   │       ├── Agents/            # AI agents (Orchestrator, Triage, etc.)
+│   │       ├── Workflows/         # MAF workflow + executors
+│   │       ├── Tools/             # GitHub API, state management
+│   │       ├── Guardrails/        # Security, command parsing
+│   │       └── Models/            # Data models
+│   └── SupportConcierge.Cli/      # CLI entry point
+├── prompts/maf-templates/         # Prompt templates
+├── evals/                         # Evaluation scenarios + rubrics
+├── tests/                         # Unit tests
+└── .supportbot/                   # Spec pack configuration
 ```
 
-More details: `evals/README.md`
-
-## Repo layout
-
-- `src/SupportConcierge.Core/Modules` - workflow, agents, tools, models (MAF DAG)
-- `src/SupportConcierge.Cli` - runtime entrypoint (MAF workflow execution)
-- `evals/` - fixtures and reports
-- `tests/` - deterministic plumbing tests
-- `.supportbot/` - spec pack config and playbooks
-
-## Proof we use MAF
-
-Packages:
-- `Microsoft.Agents.AI.Workflows` (1.0.0-preview.260108.1)
-- `Microsoft.Agents.AI` (1.0.0-preview.260108.1)
-
-Current workflow wiring (MAF DAG):
-
-```csharp
-// SupportConciergeWorkflow.Build(...)
-ParseEvent → Guardrails → (if /stop → PersistState)
-                       → Triage → Research → Response → OrchestratorEvaluate
-OrchestratorEvaluate → PersistState (if finalize/escalate/follow_up or loop>=3)
-OrchestratorEvaluate → Triage (if continue and loop<3)
-```
-
-Runtime execution:
-
-```csharp
-var workflow = SupportConciergeWorkflow.Build(triage, research, response, critic, orchestrator, tools);
-var run = await InProcessExecution.RunAsync(workflow, eventInput);
-```
-
-## License
-
-MIT (replace as needed)
 
