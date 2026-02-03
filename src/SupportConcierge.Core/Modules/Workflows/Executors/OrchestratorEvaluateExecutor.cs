@@ -42,7 +42,7 @@ public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunConte
             var beforeIncrement = input.ActiveUserConversation.LoopCount;
             input.ActiveUserConversation.LoopCount++;
             input.CurrentLoopCount = input.ActiveUserConversation.LoopCount;
-            Console.WriteLine($"[MAF] Orchestrator: {input.ActiveParticipant} Loop BEFORE increment={beforeIncrement}, AFTER increment={input.CurrentLoopCount} (will display as 'Loop {input.CurrentLoopCount} of 3')");
+            Console.WriteLine($"[MAF] Orchestrator: {input.ActiveParticipant} Loop BEFORE increment={beforeIncrement}, AFTER increment={input.CurrentLoopCount} (max 3 loops, escalate at loop 4)");
         }
         else
         {
@@ -102,7 +102,7 @@ public sealed class OrchestratorEvaluateExecutor : Executor<RunContext, RunConte
         {
             input.ShouldEscalate = true;
             input.ExecutionState.LoopActionTaken = "escalate";
-            input.ExecutionState.IsUserExhausted = input.CurrentLoopCount >= 3;
+            input.ExecutionState.IsUserExhausted = input.CurrentLoopCount >= 4;
             
             // Mark user as exhausted
             if (input.ActiveUserConversation != null)

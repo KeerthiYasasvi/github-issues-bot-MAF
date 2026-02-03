@@ -274,7 +274,7 @@ public sealed class LoadStateExecutor : Executor<RunContext, RunContext>
             {
                 Username = issueAuthor,
                 LoopCount = state.LoopCount,
-                IsExhausted = state.LoopCount >= 3,
+                IsExhausted = state.LoopCount >= 4,
                 FirstInteraction = state.LastUpdated,
                 LastInteraction = state.LastUpdated,
                 AskedFields = state.AskedFields.ToList(),

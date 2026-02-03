@@ -557,12 +557,12 @@ public sealed class WebSearchTool : ITool
     public async Task<ToolResult> ExecuteAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken = default)
     {
         if (!parameters.TryGetValue("confidence", out var confidenceValue) ||
-            !decimal.TryParse(confidenceValue, out var confidence) || confidence < 0.85m)
+            !decimal.TryParse(confidenceValue, out var confidence) || confidence < 0.60m)
         {
             return new ToolResult
             {
                 Success = false,
-                Error = "Web search blocked: confidence must be >= 0.85"
+                Error = "Web search blocked: confidence must be >= 0.60"
             };
         }
 

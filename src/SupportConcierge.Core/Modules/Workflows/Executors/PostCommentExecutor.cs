@@ -252,7 +252,7 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             sb.AppendLine("- If you need to restart analysis, comment with `/diagnose`");
             sb.AppendLine("- If you want me to stop, comment with `/stop`");
             sb.AppendLine();
-            sb.AppendLine($"_Loop {loopCount} of {maxLoops}. I'll escalate to maintainer after {maxLoops} attempts if issue remains unclear._");
+            sb.AppendLine($"_Loop {loopCount} of {maxLoops}. I'll escalate to maintainer after {maxLoops} loops if issue remains unclear._");
 
             return sb.ToString().Trim();
         }
@@ -274,7 +274,9 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             
             if (isUserExhausted)
             {
-                sb.AppendLine($"- ✅ I completed {execState?.TotalUserLoops ?? 3} loops of interaction");
+                // Show 3 as max loops to user (since loop 4 is just the escalation trigger)
+                var displayLoops = Math.Min(execState?.TotalUserLoops ?? 3, 3);
+                sb.AppendLine($"- ✅ I completed {displayLoops} loops of interaction (up to 9 questions)");
                 sb.AppendLine("- ✅ You provided responses to my clarifying questions");
                 sb.AppendLine("- ⚠️ Even with your answers, I cannot provide a confident automated response");
                 sb.AppendLine();

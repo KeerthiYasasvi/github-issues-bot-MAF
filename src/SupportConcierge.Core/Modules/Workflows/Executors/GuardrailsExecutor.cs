@@ -16,7 +16,7 @@ namespace SupportConcierge.Core.Modules.Workflows.Executors;
 /// </summary>
 public sealed class GuardrailsExecutor : Executor<RunContext, RunContext>
 {
-    private const int MaxLoops = 3;
+    private const int MaxLoops = 4;
 
     public GuardrailsExecutor()
         : base("guardrails", ExecutorDefaults.Options, false)

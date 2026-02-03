@@ -16,7 +16,7 @@ Determine which tools would be most effective for investigating this issue:
 2. Which tools would provide relevant findings?
 3. What query parameters should each tool use?
 4. What's the overall investigation strategy?
-5. Only choose WebSearchTool if you are highly confident (>=0.85) repo-only tools are insufficient.
+5. Only choose WebSearchTool if you are highly confident (>=0.60) repo-only tools are insufficient.
 
 IMPORTANT OUTPUT RULES:
 - Output MUST be valid JSON only.

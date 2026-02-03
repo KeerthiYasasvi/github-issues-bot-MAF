@@ -22,7 +22,7 @@ public class OrchestratorAgent
 {
     private readonly ILlmClient _llmClient;
     private readonly SchemaValidator _schemaValidator;
-    private const int MaxLoops = 3;
+    private const int MaxLoops = 4;
 
     public OrchestratorAgent(ILlmClient llmClient, SchemaValidator schemaValidator)
     {
@@ -107,8 +107,8 @@ public class OrchestratorAgent
     /// FIXED: Now properly implements the 3-loop user interaction pattern:
     /// Loop 1: Ask questions with initial triage/research
     /// Loop 2: With user answers, provide response or ask more questions
-    /// Loop 3: With user's final answers, provide final response with evidence/next-steps
-    /// Loop 4+: Escalate to human (user exhausted)
+    /// Loop 3: With user answers, provide response or ask more questions (up to 9 total questions)
+    /// Loop 4+: Escalate to human (user exhausted after 3 full loops)
     /// </summary>
     public async Task<OrchestratorDecision> EvaluateProgressAsync(
         RunContext context,
@@ -117,7 +117,7 @@ public class OrchestratorAgent
         List<OrchestratorDecision> previousDecisions,
         CancellationToken cancellationToken = default)
     {
-        // Check if user has exhausted loops (3 max)
+        // Check if user has exhausted loops (3 max loops means escalate at loop 4)
         const int maxUserLoops = 3;
         
         if (context.ExecutionState != null)
@@ -254,25 +254,27 @@ public class OrchestratorAgent
     }
 
     /// <summary>
-    /// Loop 3: Final loop → Provide comprehensive response with evidence
-    /// If still not enough info → Escalate
+    /// Loop 3: User provides more answers → Triage + Research
+    /// Decision: Provide response OR ask final round of questions
+    /// Escalation only happens if loop 4 is needed
     /// </summary>
     private OrchestratorDecision EvaluateThirdLoop(RunContext context, bool hasEnoughInfo)
     {
         if (!hasEnoughInfo)
         {
+            // Still need more info - ask final round of questions
+            // Bot will escalate in loop 4 if user still can't provide enough info
             if (context.ExecutionState != null)
             {
-                context.ExecutionState.LoopActionTaken = "escalate";
-                context.ExecutionState.IsUserExhausted = true;
+                context.ExecutionState.LoopActionTaken = "ask_final_questions";
             }
 
             return new OrchestratorDecision
             {
-                Action = "escalate",
-                Reasoning = "Third loop: Insufficient information even after clarifications. Escalating to human.",
-                ConfidenceScore = 0.4m,
-                NextAgent = "human"
+                Action = "respond_with_questions",
+                Reasoning = "Third loop: Still need more info. Asking final clarifying questions before potential escalation.",
+                ConfidenceScore = 0.5m,
+                NextAgent = "response_agent"
             };
         }
 

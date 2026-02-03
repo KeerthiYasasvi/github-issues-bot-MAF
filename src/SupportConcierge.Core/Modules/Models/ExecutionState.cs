@@ -135,9 +135,9 @@ public class UserLoopTracker
     public bool EscalationMessagePosted { get; set; }
 
     /// <summary>
-    /// Check if user has exhausted their loops (max 3 per issue)
+    /// Check if user has exhausted their loops (max 3 loops, escalate at loop 4)
     /// </summary>
-    public bool HasExhaustedLoops(int maxLoops = 3)
+    public bool HasExhaustedLoops(int maxLoops = 4)
     {
         return LoopCount >= maxLoops;
     }
@@ -145,7 +145,7 @@ public class UserLoopTracker
     /// <summary>
     /// Increment loop count and check if exhausted
     /// </summary>
-    public void IncrementLoop(int maxLoops = 3)
+    public void IncrementLoop(int maxLoops = 4)
     {
         LoopCount++;
         IsExhausted = LoopCount >= maxLoops;

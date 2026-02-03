@@ -116,7 +116,7 @@ public static class SupportConciergeWorkflow
         // Decision 4: Loop back for another iteration (if we haven't hit the limit)
         builder.AddEdge<RunContext>(orchestratorEvaluate, triage, ctx =>
             !((ctx?.ShouldFinalize ?? false) || (ctx?.ShouldEscalate ?? false) || (ctx?.ShouldAskFollowUps ?? false)) && 
-            ((ctx?.CurrentLoopCount ?? 0) < 3));
+            ((ctx?.CurrentLoopCount ?? 0) < 4));
 
         return builder.Build();
     }
