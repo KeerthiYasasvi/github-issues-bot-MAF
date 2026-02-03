@@ -555,8 +555,8 @@ public class OrchestratorAgent
 
         if (!response.IsSuccess)
         {
-            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): LLM response was not successful: {response.Error}");
-            defaultDirective.Reasoning = $"LLM call failed: {response.Error}";
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): LLM response was not successful. RawResponse: {Truncate(response.RawResponse, 500)}");
+            defaultDirective.Reasoning = $"LLM call failed: IsSuccess=false";
             return defaultDirective;
         }
 
