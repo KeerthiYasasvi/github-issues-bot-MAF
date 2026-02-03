@@ -555,11 +555,16 @@ public class OrchestratorAgent
 
         if (!response.IsSuccess)
         {
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): LLM response was not successful: {response.Error}");
+            defaultDirective.Reasoning = $"LLM call failed: {response.Error}";
             return defaultDirective;
         }
 
-        if (!_schemaValidator.TryValidate(response.Content, schema, out _))
+        if (!_schemaValidator.TryValidate(response.Content, schema, out var validationError))
         {
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Schema validation failed: {validationError}");
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Response content: {Truncate(response.Content, 500)}");
+            defaultDirective.Reasoning = $"Schema validation failed: {validationError}";
             return defaultDirective;
         }
 
@@ -592,8 +597,11 @@ public class OrchestratorAgent
                 Reasoning = json.TryGetProperty("reasoning", out var reasoning) ? reasoning.GetString() ?? string.Empty : string.Empty
             };
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): JSON parsing failed: {ex.Message}");
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Response content: {Truncate(response.Content, 500)}");
+            defaultDirective.Reasoning = $"JSON parsing failed: {ex.Message}";
             return defaultDirective;
         }
     }
