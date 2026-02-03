@@ -11,10 +11,25 @@ Rules:
 - Provide tool_priority to control order (first = highest priority).
 - Suggested priorities:
   - documentation_issue: DocumentationSearchTool, GitHubSearchTool
-  - runtime_error/bug_report: GitHubSearchTool, CodeAnalysisTool, ValidationTool
+  - runtime_error/bug_report: GitHubSearchTool, CodeAnalysisTool, WebSearchTool
   - configuration_error/environment_setup: ValidationTool, DocumentationSearchTool
 
-Return ONLY valid JSON matching the schema.
+Return ONLY valid JSON with ALL required fields. Example:
+```json
+{
+  "should_research": true,
+  "allowed_tools": ["GitHubSearchTool", "WebSearchTool"],
+  "tool_priority": ["GitHubSearchTool", "WebSearchTool"],
+  "allow_web_search": true,
+  "query_quality": "high",
+  "recommended_query": "specific search query here",
+  "max_tools": 3,
+  "max_findings": 5,
+  "reasoning": "Brief explanation of the decision"
+}
+```
+
+IMPORTANT: Set allow_web_search=true when query_quality="high" to enable WebSearchTool.
 ===USER===
 Available tools: {{AVAILABLE_TOOLS}}
 

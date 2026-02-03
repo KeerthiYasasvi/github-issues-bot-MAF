@@ -560,42 +560,90 @@ public class OrchestratorAgent
             return defaultDirective;
         }
 
-        if (!_schemaValidator.TryValidate(response.Content, schema, out var validationError))
+        // Log schema validation but don't fail on it - try to extract values anyway
+        if (!_schemaValidator.TryValidate(response.Content, schema, out var validationErrors))
         {
-            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Schema validation failed: {validationError}");
-            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Response content: {Truncate(response.Content, 500)}");
-            defaultDirective.Reasoning = $"Schema validation failed: {validationError}";
-            return defaultDirective;
+            var errorDetails = validationErrors != null && validationErrors.Count > 0 
+                ? string.Join("; ", validationErrors) 
+                : "Unknown validation error";
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Schema validation warning: {errorDetails}");
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Will attempt to extract values from response anyway...");
         }
 
+        // Try to parse JSON and extract values (even if schema validation failed)
         try
         {
             var json = JsonSerializer.Deserialize<JsonElement>(response.Content);
+            
+            // Extract tools with fallback to defaults
             var tools = json.TryGetProperty("allowed_tools", out var toolsProp)
                 ? toolsProp.EnumerateArray()
                     .Select(t => t.GetString() ?? string.Empty)
                     .Where(t => !string.IsNullOrWhiteSpace(t))
                     .ToList()
                 : new List<string>();
+            
+            // If no allowed_tools but tool_priority exists, use that as allowed_tools
             var priority = json.TryGetProperty("tool_priority", out var priorityProp)
                 ? priorityProp.EnumerateArray()
                     .Select(t => t.GetString() ?? string.Empty)
                     .Where(t => !string.IsNullOrWhiteSpace(t))
                     .ToList()
                 : new List<string>();
-
-            return new ResearchDirective
+            
+            if (tools.Count == 0 && priority.Count > 0)
             {
-                ShouldResearch = json.GetProperty("should_research").GetBoolean(),
+                tools = new List<string>(priority);
+            }
+            
+            // Default allowed_tools if still empty
+            if (tools.Count == 0)
+            {
+                tools = new List<string> { "GitHubSearchTool", "DocumentationSearchTool" };
+            }
+
+            // Extract query quality - this is the critical field for WebSearchTool
+            var queryQuality = json.TryGetProperty("query_quality", out var quality) 
+                ? quality.GetString() ?? "low" 
+                : "low";
+            
+            // Check if web search should be allowed
+            // Allow web search if: explicitly allowed OR (query_quality is high AND WebSearchTool is in tools/priority)
+            var allowWebSearch = json.TryGetProperty("allow_web_search", out var allowWeb) && allowWeb.GetBoolean();
+            
+            // If LLM said query_quality is "high" but forgot to set allow_web_search, infer it
+            if (!allowWebSearch && queryQuality == "high")
+            {
+                var hasWebSearchInTools = tools.Any(t => t.Contains("WebSearch", StringComparison.OrdinalIgnoreCase)) ||
+                                          priority.Any(t => t.Contains("WebSearch", StringComparison.OrdinalIgnoreCase));
+                if (hasWebSearchInTools)
+                {
+                    Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Inferring allow_web_search=true from query_quality=high and WebSearchTool in tools");
+                    allowWebSearch = true;
+                }
+            }
+            
+            // Add WebSearchTool to allowed tools if allow_web_search is true and not already present
+            if (allowWebSearch && !tools.Any(t => t.Contains("WebSearch", StringComparison.OrdinalIgnoreCase)))
+            {
+                tools.Add("WebSearchTool");
+            }
+
+            var directive = new ResearchDirective
+            {
+                ShouldResearch = json.TryGetProperty("should_research", out var shouldResearch) && shouldResearch.GetBoolean(),
                 AllowedTools = tools,
                 ToolPriority = priority,
-                AllowWebSearch = json.TryGetProperty("allow_web_search", out var allowWeb) && allowWeb.GetBoolean(),
-                QueryQuality = json.TryGetProperty("query_quality", out var quality) ? quality.GetString() ?? "low" : "low",
+                AllowWebSearch = allowWebSearch,
+                QueryQuality = queryQuality,
                 RecommendedQuery = json.TryGetProperty("recommended_query", out var query) ? query.GetString() ?? string.Empty : string.Empty,
-                MaxTools = json.TryGetProperty("max_tools", out var maxTools) ? maxTools.GetInt32() : 0,
-                MaxFindings = json.TryGetProperty("max_findings", out var maxFindings) ? maxFindings.GetInt32() : 0,
-                Reasoning = json.TryGetProperty("reasoning", out var reasoning) ? reasoning.GetString() ?? string.Empty : string.Empty
+                MaxTools = json.TryGetProperty("max_tools", out var maxTools) ? maxTools.GetInt32() : 3,
+                MaxFindings = json.TryGetProperty("max_findings", out var maxFindings) ? maxFindings.GetInt32() : 5,
+                Reasoning = json.TryGetProperty("reasoning", out var reasoning) ? reasoning.GetString() ?? "Extracted from LLM response" : "Extracted from LLM response"
             };
+            
+            Console.WriteLine($"[MAF] Orchestrator(ResearchGate): Successfully parsed directive - query_quality={directive.QueryQuality}, allow_web_search={directive.AllowWebSearch}");
+            return directive;
         }
         catch (Exception ex)
         {
@@ -616,8 +664,6 @@ public class OrchestratorAgent
         return value.Substring(0, maxLength) + "…";
     }
 }
-
-/// <summary>
 /// Orchestrator's initial plan for handling an issue
 /// </summary>
 public class OrchestratorPlan
