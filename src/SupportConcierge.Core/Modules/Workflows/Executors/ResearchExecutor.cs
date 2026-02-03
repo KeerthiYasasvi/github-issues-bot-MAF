@@ -152,25 +152,34 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         Console.WriteLine($"[MAF] Research: Found {investigationResult.Findings.Count} findings");
         LogFindings("Research", investigationResult);
 
-        // Critique research
-        var researchCritique = await _criticAgent.CritiqueResearchAsync(input, null, investigationResult.Findings.Select(f => f.Content).ToList(), ct);
-        if (!researchCritique.IsPassable)
+        // Critique research - wrapped in try-catch to prevent workflow termination
+        try
         {
-            Console.WriteLine($"[MAF] Research (Critique): Failed critique (score: {researchCritique.Score}/10), performing deep dive...");
-            LogCritiqueSummary("Research", researchCritique);
-            var deepDiveResults = await _researchAgent.DeepDiveAsync(input, triageResult, investigationResult, researchCritique, new Dictionary<string, string>(), ct);
-            investigationResult = deepDiveResults;
-            input.ResearchDeepDived = true;
-            if (directive != null && directive.MaxFindings > 0)
+            var researchCritique = await _criticAgent.CritiqueResearchAsync(input, null, investigationResult.Findings.Select(f => f.Content).ToList(), ct);
+            if (!researchCritique.IsPassable)
             {
-                TrimFindings(investigationResult, directive.MaxFindings);
+                Console.WriteLine($"[MAF] Research (Critique): Failed critique (score: {researchCritique.Score}/10), performing deep dive...");
+                LogCritiqueSummary("Research", researchCritique);
+                var deepDiveResults = await _researchAgent.DeepDiveAsync(input, triageResult, investigationResult, researchCritique, new Dictionary<string, string>(), ct);
+                investigationResult = deepDiveResults;
+                input.ResearchDeepDived = true;
+                if (directive != null && directive.MaxFindings > 0)
+                {
+                    TrimFindings(investigationResult, directive.MaxFindings);
+                }
+                Console.WriteLine($"[MAF] Research: Deep dive completed, now {investigationResult.Findings.Count} findings");
+                LogFindings("Research", investigationResult);
             }
-            Console.WriteLine($"[MAF] Research: Deep dive completed, now {investigationResult.Findings.Count} findings");
-            LogFindings("Research", investigationResult);
+            else
+            {
+                Console.WriteLine($"[MAF] Research (Critique): Passed critique (score: {researchCritique.Score}/10)");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Console.WriteLine($"[MAF] Research (Critique): Passed critique (score: {researchCritique.Score}/10)");
+            // Log the exception but don't fail the workflow - continue with uncritiqued research
+            Console.WriteLine($"[MAF] Research (Critique): Exception during critique - {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine("[MAF] Research (Critique): Continuing with uncritiqued research result");
         }
 
         input.InvestigationResult = investigationResult;

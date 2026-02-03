@@ -211,28 +211,38 @@ public class CriticAgent
         List<string> issues,
         List<string> suggestions)
     {
-        var clean = ExtractJsonFromResponseStatic(content);
-        var json = JsonSerializer.Deserialize<JsonElement>(clean);
-
-        if (json.TryGetProperty("subscores", out var subs))
+        try
         {
-            foreach (var prop in subs.EnumerateObject())
+            var clean = ExtractJsonFromResponseStatic(content);
+            var json = JsonSerializer.Deserialize<JsonElement>(clean);
+
+            if (json.TryGetProperty("subscores", out var subs))
             {
-                if (prop.Value.ValueKind == JsonValueKind.Number && prop.Value.TryGetDouble(out var value))
+                foreach (var prop in subs.EnumerateObject())
                 {
-                    subscores[prop.Name] = value;
+                    if (prop.Value.ValueKind == JsonValueKind.Number && prop.Value.TryGetDouble(out var value))
+                    {
+                        subscores[prop.Name] = value;
+                    }
                 }
             }
-        }
 
-        if (json.TryGetProperty("issues", out var issuesProp))
-        {
-            issues.AddRange(issuesProp.EnumerateArray().Select(x => x.GetString() ?? string.Empty));
-        }
+            if (json.TryGetProperty("issues", out var issuesProp))
+            {
+                issues.AddRange(issuesProp.EnumerateArray().Select(x => x.GetString() ?? string.Empty));
+            }
 
-        if (json.TryGetProperty("suggestions", out var suggProp))
+            if (json.TryGetProperty("suggestions", out var suggProp))
+            {
+                suggestions.AddRange(suggProp.EnumerateArray().Select(x => x.GetString() ?? string.Empty));
+            }
+        }
+        catch (JsonException ex)
         {
-            suggestions.AddRange(suggProp.EnumerateArray().Select(x => x.GetString() ?? string.Empty));
+            Console.WriteLine($"[MAF] Critic: Failed to parse judge response JSON: {ex.Message}");
+            Console.WriteLine($"[MAF] Critic: Content preview: {content?.Substring(0, Math.Min(200, content?.Length ?? 0)) ?? "null"}");
+            // Don't throw - just continue with empty subscores/issues/suggestions
+            // The deterministic score will be used as fallback
         }
     }
 

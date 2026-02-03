@@ -50,34 +50,43 @@ public sealed class ResponseExecutor : Executor<RunContext, RunContext>
             Console.WriteLine($"[MAF] Response: Next steps preview = {stepsPreview}");
         }
 
-        // Critique response
-        var responseCritique = await _criticAgent.CritiqueResponseAsync(input, input.Brief, null, ct);
-        if (!responseCritique.IsPassable)
+        // Critique response - wrapped in try-catch to prevent workflow termination
+        try
         {
-            Console.WriteLine($"[MAF] Response (Critique): Failed critique (score: {responseCritique.Score}/10), refining...");
-            LogCritiqueSummary("Response", responseCritique);
-            responseResult = await _responseAgent.RefineAsync(input, triageResult, investigationResult, responseResult, responseCritique, ct);
-            input.ResponseRefined = true;
-            var refinedEvidence = new List<string>();
-            if (!string.IsNullOrWhiteSpace(responseResult.Brief.Explanation))
+            var responseCritique = await _criticAgent.CritiqueResponseAsync(input, input.Brief, null, ct);
+            if (!responseCritique.IsPassable)
             {
-                refinedEvidence.Add(responseResult.Brief.Explanation);
-            }
-            refinedEvidence.AddRange(ExtractIssueReferences(investigationResult));
+                Console.WriteLine($"[MAF] Response (Critique): Failed critique (score: {responseCritique.Score}/10), refining...");
+                LogCritiqueSummary("Response", responseCritique);
+                responseResult = await _responseAgent.RefineAsync(input, triageResult, investigationResult, responseResult, responseCritique, ct);
+                input.ResponseRefined = true;
+                var refinedEvidence = new List<string>();
+                if (!string.IsNullOrWhiteSpace(responseResult.Brief.Explanation))
+                {
+                    refinedEvidence.Add(responseResult.Brief.Explanation);
+                }
+                refinedEvidence.AddRange(ExtractIssueReferences(investigationResult));
 
-            input.Brief = new EngineerBrief
+                input.Brief = new EngineerBrief
+                {
+                    Summary = responseResult.Brief.Summary,
+                    Symptoms = new List<string> { responseResult.Brief.Title },
+                    Environment = new Dictionary<string, string>(),
+                    KeyEvidence = refinedEvidence,
+                    NextSteps = responseResult.Brief.NextSteps
+                };
+                Console.WriteLine("[MAF] Response: Refined brief");
+            }
+            else
             {
-                Summary = responseResult.Brief.Summary,
-                Symptoms = new List<string> { responseResult.Brief.Title },
-                Environment = new Dictionary<string, string>(),
-                KeyEvidence = refinedEvidence,
-                NextSteps = responseResult.Brief.NextSteps
-            };
-            Console.WriteLine("[MAF] Response: Refined brief");
+                Console.WriteLine($"[MAF] Response (Critique): Passed critique (score: {responseCritique.Score}/10)");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Console.WriteLine($"[MAF] Response (Critique): Passed critique (score: {responseCritique.Score}/10)");
+            // Log the exception but don't fail the workflow - continue with uncritiqued response
+            Console.WriteLine($"[MAF] Response (Critique): Exception during critique - {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine("[MAF] Response (Critique): Continuing with uncritiqued response result");
         }
 
         input.ResponseResult = responseResult;

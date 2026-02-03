@@ -39,21 +39,30 @@ public sealed class TriageExecutor : Executor<RunContext, RunContext>
             Console.WriteLine($"[MAF] Triage: Extracted details preview = {detailsPreview}");
         }
 
-        // Critique triage
-        var triageCritique = await _criticAgent.CritiqueTriageAsync(input, input.CategoryDecision, ct);
-        if (!triageCritique.IsPassable)
+        // Critique triage - wrapped in try-catch to prevent workflow termination
+        try
         {
-            Console.WriteLine($"[MAF] Triage (Critique): Failed critique (score: {triageCritique.Score}/10), refining...");
-            LogCritiqueSummary("Triage", triageCritique);
-            triageResult = await _triageAgent.RefineAsync(input, triageResult, triageCritique, ct);
-            input.TriageRefined = true;
-            input.CategoryDecision.Category = triageResult.Categories.FirstOrDefault() ?? "unclassified";
-            Console.WriteLine($"[MAF] Triage: Refined category = {input.CategoryDecision.Category}");
-            Console.WriteLine($"[MAF] Triage: Refined reasoning = {Truncate(triageResult.Reasoning, 240)}");
+            var triageCritique = await _criticAgent.CritiqueTriageAsync(input, input.CategoryDecision, ct);
+            if (!triageCritique.IsPassable)
+            {
+                Console.WriteLine($"[MAF] Triage (Critique): Failed critique (score: {triageCritique.Score}/10), refining...");
+                LogCritiqueSummary("Triage", triageCritique);
+                triageResult = await _triageAgent.RefineAsync(input, triageResult, triageCritique, ct);
+                input.TriageRefined = true;
+                input.CategoryDecision.Category = triageResult.Categories.FirstOrDefault() ?? "unclassified";
+                Console.WriteLine($"[MAF] Triage: Refined category = {input.CategoryDecision.Category}");
+                Console.WriteLine($"[MAF] Triage: Refined reasoning = {Truncate(triageResult.Reasoning, 240)}");
+            }
+            else
+            {
+                Console.WriteLine($"[MAF] Triage (Critique): Passed critique (score: {triageCritique.Score}/10)");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Console.WriteLine($"[MAF] Triage (Critique): Passed critique (score: {triageCritique.Score}/10)");
+            // Log the exception but don't fail the workflow - continue with uncritiqued triage
+            Console.WriteLine($"[MAF] Triage (Critique): Exception during critique - {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine("[MAF] Triage (Critique): Continuing with uncritiqued triage result");
         }
 
         input.TriageResult = triageResult;
