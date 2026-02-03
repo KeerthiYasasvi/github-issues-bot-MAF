@@ -174,7 +174,7 @@ public sealed class SecretRedactor
         }
 
         // Check for padding and valid Base64 structure
-        var validBase64 = Regex.IsMatch(value, @"^[A-Za-z0-9+/]{4}*={0,2}$");
+        var validBase64 = Regex.IsMatch(value, @"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$");
         if (!validBase64)
         {
             return false;
