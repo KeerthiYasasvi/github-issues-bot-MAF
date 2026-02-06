@@ -317,6 +317,17 @@ public sealed class PostCommentExecutor : Executor<RunContext, RunContext>
             return sb.ToString().Trim();
         }
 
+        // Check for self-resolution confirmation
+        if (input.ShouldFinalize && input.ExecutionState?.LoopActionTaken == "confirm_self_resolution")
+        {
+            sb.AppendLine("It sounds like you've identified the solution! 🎉");
+            sb.AppendLine();
+            sb.AppendLine("If the fix works, feel free to close this issue. If you run into other problems, just comment here and I'll help investigate.");
+            sb.AppendLine();
+            sb.AppendLine("Good luck!");
+            return sb.ToString().Trim();
+        }
+
         // Brief/solution format (when issue is actionable)
         var brief = input.Brief;
         if (brief != null)

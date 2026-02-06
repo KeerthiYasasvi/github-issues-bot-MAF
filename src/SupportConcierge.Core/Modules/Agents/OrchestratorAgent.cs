@@ -144,6 +144,24 @@ public class OrchestratorAgent
             };
         }
 
+        // Check if user has self-resolved (indicated they know the fix)
+        var selfResolved = DetectSelfResolution(context);
+        if (selfResolved)
+        {
+            Console.WriteLine("[MAF] Orchestrator: User appears to have self-resolved. Providing confirmation response.");
+            if (context.ExecutionState != null)
+            {
+                context.ExecutionState.LoopActionTaken = "confirm_self_resolution";
+            }
+            return new OrchestratorDecision
+            {
+                Action = "finalize",
+                Reasoning = "User indicated they know the solution or will try a fix. Providing confirmation.",
+                ConfidenceScore = 0.9m,
+                NextAgent = "response_agent"
+            };
+        }
+
         // Check if resolution is achievable with current information
         var infoSufficiency = await AssessInformationSufficiencyAsync(context, plan, cancellationToken);
         var deterministicEnough = (context.Scoring?.IsActionable ?? false) || context.CasePacket.Fields.Count > 0;
@@ -469,6 +487,88 @@ public class OrchestratorAgent
         {
             return currentPlan;
         }
+    }
+
+    /// <summary>
+    /// Detect if user has self-resolved by indicating they know the fix or will try something.
+    /// This prevents asking unnecessary follow-up questions.
+    /// </summary>
+    private static bool DetectSelfResolution(RunContext context)
+    {
+        // Only check on loop 2+ (after user has responded to questions)
+        var loopCount = context.ActiveUserConversation?.LoopCount ?? context.CurrentLoopCount ?? 1;
+        if (loopCount < 2)
+        {
+            return false;
+        }
+
+        // Get the latest user comment
+        var latestComment = context.Issue?.Body;
+        if (context.Comments != null && context.Comments.Count > 0)
+        {
+            // Get the most recent non-bot comment
+            var userComments = context.Comments
+                .Where(c => c.User?.Login != null && 
+                            !c.User.Login.Contains("bot", StringComparison.OrdinalIgnoreCase) &&
+                            !c.User.Login.Equals("github-actions", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(c => c.CreatedAt)
+                .ToList();
+            
+            if (userComments.Count > 0)
+            {
+                latestComment = userComments[0].Body;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(latestComment))
+        {
+            return false;
+        }
+
+        var lowerComment = latestComment.ToLowerInvariant();
+
+        // Patterns indicating user knows the solution
+        var selfResolutionPatterns = new[]
+        {
+            "i'll try",
+            "i will try",
+            "i'll add",
+            "i will add",
+            "i'll set",
+            "i will set",
+            "i'll update",
+            "i will update",
+            "i'll change",
+            "i will change",
+            "i'll fix",
+            "i will fix",
+            "i need to",
+            "i should",
+            "let me try",
+            "going to try",
+            "gonna try",
+            "that worked",
+            "this worked",
+            "it works now",
+            "solved it",
+            "fixed it",
+            "found the issue",
+            "found the problem",
+            "figured it out",
+            "that was the issue",
+            "that was the problem",
+            "my mistake",
+            "i forgot to",
+            "i missed",
+            "i didn't set",
+            "i didn't have",
+            "wasn't set",
+            "wasn't configured",
+            "missing the",
+            "need to add"
+        };
+
+        return selfResolutionPatterns.Any(pattern => lowerComment.Contains(pattern));
     }
 
     private async Task<InfoSufficiencyResult> AssessInformationSufficiencyAsync(
