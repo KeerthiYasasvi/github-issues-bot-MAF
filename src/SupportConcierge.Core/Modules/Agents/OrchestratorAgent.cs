@@ -637,6 +637,13 @@ public class OrchestratorAgent
         var response = await _llmClient.CompleteAsync(request, cancellationToken);
         if (!response.IsSuccess)
         {
+            Console.WriteLine($"[MAF] Orchestrator(Sufficiency): LLM call failed. Checking if user has provided answers...");
+            // Fallback: if user has commented with substantial content, assume they've provided info
+            if (!string.IsNullOrWhiteSpace(conversationContext) && conversationContext.Length > 100)
+            {
+                Console.WriteLine($"[MAF] Orchestrator(Sufficiency): User provided answers ({conversationContext.Length} chars), assuming sufficient for now.");
+                return new InfoSufficiencyResult(true, new List<string>(), "LLM failed but user appears to have answered questions.");
+            }
             return new InfoSufficiencyResult(
                 false,
                 new List<string> { "sufficiency_check_failed" },
@@ -645,6 +652,7 @@ public class OrchestratorAgent
 
         try
         {
+            Console.WriteLine($"[MAF] Orchestrator(Sufficiency): Parsing response ({response.Content?.Length ?? 0} chars)");
             var json = JsonSerializer.Deserialize<JsonElement>(response.Content);
             var hasEnoughInfo = json.GetProperty("has_enough_info").GetBoolean();
             var missing = json.TryGetProperty("missing_info", out var missingProp)
@@ -652,10 +660,23 @@ public class OrchestratorAgent
                 : new List<string>();
             var reasoning = json.GetProperty("reasoning").GetString() ?? string.Empty;
 
+            Console.WriteLine($"[MAF] Orchestrator(Sufficiency): Parsed successfully - has_enough_info={hasEnoughInfo}, missing_count={missing.Count}");
             return new InfoSufficiencyResult(hasEnoughInfo, missing, reasoning);
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[MAF] Orchestrator(Sufficiency): Parse error: {ex.Message}");
+            Console.WriteLine($"[MAF] Orchestrator(Sufficiency): Raw response (first 500 chars): {Truncate(response.Content, 500)}");
+            
+            // Fallback: If parsing fails BUT user has provided substantial answers, don't keep asking same questions
+            // This prevents the "asking same questions" bug when LLM response is malformed
+            if (!string.IsNullOrWhiteSpace(conversationContext) && conversationContext.Length > 100)
+            {
+                Console.WriteLine($"[MAF] Orchestrator(Sufficiency): Parse failed but user provided answers. Assuming sufficient to avoid repetition.");
+                return new InfoSufficiencyResult(true, new List<string>(), 
+                    "Parse failed but user appears to have answered questions - proceeding to avoid asking same questions.");
+            }
+            
             return new InfoSufficiencyResult(
                 false,
                 new List<string> { "sufficiency_parse_failed" },
