@@ -502,23 +502,9 @@ public class OrchestratorAgent
             return false;
         }
 
-        // Get the latest user comment
-        var latestComment = context.Issue?.Body;
-        if (context.Comments != null && context.Comments.Count > 0)
-        {
-            // Get the most recent non-bot comment
-            var userComments = context.Comments
-                .Where(c => c.User?.Login != null && 
-                            !c.User.Login.Contains("bot", StringComparison.OrdinalIgnoreCase) &&
-                            !c.User.Login.Equals("github-actions", StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(c => c.CreatedAt)
-                .ToList();
-            
-            if (userComments.Count > 0)
-            {
-                latestComment = userComments[0].Body;
-            }
-        }
+        // Get the latest user comment - use IncomingComment if available (triggered by comment),
+        // otherwise use Issue body (triggered by issue opened)
+        var latestComment = context.IncomingComment?.Body ?? context.Issue?.Body;
 
         if (string.IsNullOrWhiteSpace(latestComment))
         {
