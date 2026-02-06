@@ -164,11 +164,15 @@ public class OrchestratorAgent
 
         // Check if resolution is achievable with current information
         var infoSufficiency = await AssessInformationSufficiencyAsync(context, plan, cancellationToken);
-        var deterministicEnough = (context.Scoring?.IsActionable ?? false) || context.CasePacket.Fields.Count > 0;
-        var hasEnoughInfo = deterministicEnough || infoSufficiency.HasEnoughInfo;
+        
+        // IMPORTANT: Trust the LLM's has_enough_info decision
+        // The previous logic used deterministicEnough (IsActionable || Fields.Count > 0) to OVERRIDE
+        // the LLM's decision, but having extracted fields doesn't mean we have ENOUGH info.
+        // The LLM considers the full context when deciding if more questions are needed.
+        var hasEnoughInfo = infoSufficiency.HasEnoughInfo;
 
         context.DecisionPath["info_sufficiency"] = hasEnoughInfo ? "true" : "false";
-        Console.WriteLine($"[MAF] Orchestrator: Sufficiency has_enough_info={infoSufficiency.HasEnoughInfo}, deterministic_enough={deterministicEnough}");
+        Console.WriteLine($"[MAF] Orchestrator: Sufficiency has_enough_info={infoSufficiency.HasEnoughInfo}");
         if (infoSufficiency.MissingInfo.Count > 0)
         {
             Console.WriteLine($"[MAF] Orchestrator: Missing info = {string.Join(", ", infoSufficiency.MissingInfo.Take(4))}");
