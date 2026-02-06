@@ -563,6 +563,37 @@ public class OrchestratorAgent
         return selfResolutionPatterns.Any(pattern => lowerComment.Contains(pattern));
     }
 
+    /// <summary>
+    /// Build conversation context including user's most recent comment/answers
+    /// This helps the sufficiency check understand what information the user has already provided
+    /// </summary>
+    private static string BuildConversationContext(RunContext context)
+    {
+        var sb = new System.Text.StringBuilder();
+        
+        // Include the user's most recent comment (their answers to our questions)
+        if (context.IncomingComment?.Body != null && !string.IsNullOrWhiteSpace(context.IncomingComment.Body))
+        {
+            var author = context.IncomingComment.User?.Login ?? "User";
+            sb.AppendLine("--- Latest Comment from User ---");
+            sb.AppendLine($"From: {author}");
+            sb.AppendLine(context.IncomingComment.Body);
+            sb.AppendLine();
+        }
+        
+        // Include what the bot previously asked (so we know what questions were answered)
+        var currentLoop = context.CurrentLoopCount ?? 1;
+        if (currentLoop > 1)
+        {
+            sb.AppendLine($"--- Context ---");
+            sb.AppendLine($"This is loop {currentLoop}. The bot has already asked questions in previous loops.");
+            sb.AppendLine("The user's comment above is their response to those questions.");
+            sb.AppendLine();
+        }
+        
+        return sb.ToString().Trim();
+    }
+
     private async Task<InfoSufficiencyResult> AssessInformationSufficiencyAsync(
         RunContext context,
         OrchestratorPlan plan,
@@ -574,6 +605,9 @@ public class OrchestratorAgent
             ? string.Join(", ", context.Scoring.MissingFields)
             : "none";
 
+        // Build conversation context including user's comment/answers
+        var conversationContext = BuildConversationContext(context);
+
         var (systemPrompt, userPrompt) = await MafPromptTemplates.LoadAsync(
             "orchestrator-sufficiency.md",
             new Dictionary<string, string>
@@ -583,7 +617,8 @@ public class OrchestratorAgent
                 ["CATEGORY"] = context.CategoryDecision?.Category ?? "unknown",
                 ["CASE_PACKET_FIELDS"] = string.IsNullOrWhiteSpace(fieldsText) ? "none" : fieldsText,
                 ["MISSING_FIELDS"] = missingFields,
-                ["PLAN_INFO_NEEDED"] = plan?.InformationNeeded?.Count > 0 ? string.Join(", ", plan.InformationNeeded) : "none"
+                ["PLAN_INFO_NEEDED"] = plan?.InformationNeeded?.Count > 0 ? string.Join(", ", plan.InformationNeeded) : "none",
+                ["CONVERSATION_HISTORY"] = conversationContext
             },
             cancellationToken);
 
