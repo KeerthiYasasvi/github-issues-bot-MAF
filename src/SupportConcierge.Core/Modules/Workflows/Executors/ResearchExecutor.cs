@@ -55,9 +55,23 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         if (directive != null && directive.AllowedTools.Count > 0)
         {
             var allowed = new HashSet<string>(directive.AllowedTools, StringComparer.OrdinalIgnoreCase);
-            selectedTools.SelectedTools = selectedTools.SelectedTools
+            var filtered = selectedTools.SelectedTools
                 .Where(t => allowed.Contains(t.ToolName))
                 .ToList();
+            
+            // If filtering removed all tools, use the first allowed tool as default
+            if (filtered.Count == 0 && allowed.Count > 0)
+            {
+                var defaultToolName = directive.AllowedTools.First();
+                filtered.Add(new Agents.SelectedTool
+                {
+                    ToolName = defaultToolName,
+                    Reasoning = $"Default tool from allowed list for {string.Join("/", triageResult.Categories)} issue",
+                    QueryParameters = new Dictionary<string, string>()
+                });
+                Console.WriteLine($"[MAF] Research: No selected tools matched allowed list, using default: {defaultToolName}");
+            }
+            selectedTools.SelectedTools = filtered;
         }
 
         if (directive != null)
@@ -98,6 +112,18 @@ public sealed class ResearchExecutor : Executor<RunContext, RunContext>
         {
             selectedTools.SelectedTools = selectedTools.SelectedTools.Take(directive.MaxTools).ToList();
             Console.WriteLine($"[MAF] Research: Applied tool budget. Using top {directive.MaxTools} tools.");
+        }
+
+        // Final safeguard: ensure at least one tool
+        if (selectedTools.SelectedTools.Count == 0)
+        {
+            Console.WriteLine("[MAF] Research: WARNING - No tools selected, adding GitHubSearchTool as fallback");
+            selectedTools.SelectedTools.Add(new Agents.SelectedTool
+            {
+                ToolName = "GitHubSearchTool",
+                Reasoning = "Fallback tool - search for similar issues",
+                QueryParameters = new Dictionary<string, string>()
+            });
         }
 
         input.SelectedTools = selectedTools.SelectedTools.ToList();
