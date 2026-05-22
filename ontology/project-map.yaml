@@ -1,0 +1,27 @@
+project:
+  name: "github-issues-bot-MAF"
+  github_repo: "KeerthiYasasvi/github-issues-bot-MAF"
+  type: "agentic-ai"
+  priority: "flagship"
+  status: "TODO"
+
+summary: "TODO: Add a one-paragraph summary grounded in repository evidence."
+
+problem:
+  statement: "TODO"
+  users: []
+
+scope:
+  in_scope: []
+  out_of_scope: []
+
+evidence:
+  primary_sources:
+    - README.md
+    - docs/
+    - specs/
+    - src/
+
+notes:
+  - "Do not add unsupported claims."
+  - "Mark unclear information as TODO."

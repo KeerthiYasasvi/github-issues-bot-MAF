@@ -1,0 +1,16 @@
+system:
+  purpose: "TODO"
+  context: "TODO"
+
+components: []
+
+external_dependencies: []
+
+data_flows: []
+
+deployment:
+  runtime: "TODO"
+  environments: []
+
+notes:
+  - "Describe only components supported by repository evidence."

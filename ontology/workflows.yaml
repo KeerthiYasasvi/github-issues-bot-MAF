@@ -1,0 +1,8 @@
+workflows: []
+
+events: []
+
+artifacts: []
+
+notes:
+  - "Represent meaningful execution flows, not every small code path."

@@ -6,6 +6,7 @@ artifacts/
 # User secrets / env
 .env
 .env.*
+!.env.example
 
 # IDE
 .vs/
@@ -37,3 +38,37 @@ docs/
 *.md
 !README.md
 !prompts/**/*.md
+
+# Project Memory OS tracked files
+!.github/copilot-instructions.md
+!.github/workflows/
+!.github/workflows/*.yml
+!.github/prompts/
+!.github/prompts/**/*.md
+!.github/agents/
+!.github/agents/**
+!.specify/
+!.specify/**
+!docs/
+docs/*
+!docs/architecture.md
+!docs/setup.md
+!docs/changelog.md
+!docs/decisions.md
+!interview/
+!interview/**/*.md
+!evals/
+!evals/**/*.md
+!ontology/
+!ontology/**/*.yaml
+!specs/
+!specs/**/*.md
+
+# Project Memory OS safety rules
+.env.local
+.env.*.local
+*.pem
+*.p12
+*.key
+id_rsa
+id_ed25519

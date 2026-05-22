@@ -1,0 +1,32 @@
+name: Project Memory Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  memory-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required project memory files
+        run: |
+          test -f docs/architecture.md
+          test -f docs/changelog.md
+          test -f ontology/project-map.yaml
+          test -f ontology/architecture.yaml
+          test -f ontology/skills-map.yaml
+          test -f interview/pitch.md
+          test -f interview/resume-bullets.md
+
+      - name: Check no obvious secrets committed
+        run: |
+          ! grep -R "OPENAI_API_KEY=" . --exclude-dir=.git
+          ! grep -R "GITHUB_TOKEN=" . --exclude-dir=.git
+          ! grep -R "AZURE_CLIENT_SECRET=" . --exclude-dir=.git
+          ! find . -name ".env" -not -path "./.git/*" | grep .
+          ! find . -name "*.pem" -not -path "./.git/*" | grep .
+          ! find . -name "id_rsa" -not -path "./.git/*" | grep .
+          ! find . -name "id_ed25519" -not -path "./.git/*" | grep .
