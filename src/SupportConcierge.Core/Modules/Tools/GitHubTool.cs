@@ -95,7 +95,17 @@ public sealed class GitHubTool : IGitHubTool
         var request = new AddLabelsRequest { Labels = labels };
         var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync(url, content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        Console.WriteLine($"[GitHubTool] Label add skipped for {owner}/{repo}#{issueNumber}. Status={(int)response.StatusCode} {response.StatusCode}. Labels=[{string.Join(", ", labels)}]");
+        if (!string.IsNullOrWhiteSpace(body))
+        {
+            Console.WriteLine($"[GitHubTool] Label add response: {body}");
+        }
     }
 
     public async Task AddAssigneesAsync(string owner, string repo, int issueNumber, List<string> assignees, CancellationToken cancellationToken = default)
