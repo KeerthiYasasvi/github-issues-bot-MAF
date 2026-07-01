@@ -7,8 +7,8 @@ This bot runs as a GitHub Action on `issues` and `issue_comment` events. Use a s
 1) Create or pick a sandbox repo (ex: `ytm-stream-analytics`).
 2) Add labels referenced by `.supportbot/routing.yaml` (or edit routing to match existing labels).
 3) Add repository variables:
-  - `PRIMARY_MODEL` (e.g., "gpt-5.4-mini")
-  - `SECONDARY_MODEL` (e.g., "gpt-5.4-nano")
+  - `PRIMARY_MODEL` (e.g., "gpt-5.4-nano")
+  - `SECONDARY_MODEL` (e.g., "gpt-5-nano")
    - `SUPPORTBOT_DRY_RUN` (true/false)
    - `SUPPORTBOT_WRITE_MODE` (true/false)
 4) Add repository secrets:
@@ -64,8 +64,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPPORTBOT_USERNAME: github-actions[bot]
           OPENAI_API_KEY: ${{ secrets.API_KEY }}
-          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL || 'gpt-5.4-mini' }}
-          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL || 'gpt-5.4-nano' }}
+          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL || 'gpt-5.4-nano' }}
+          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL || 'gpt-5-nano' }}
           SUPPORTBOT_DRY_RUN: ${{ vars.SUPPORTBOT_DRY_RUN || 'false' }}
           SUPPORTBOT_WRITE_MODE: ${{ vars.SUPPORTBOT_WRITE_MODE || 'true' }}
           SUPPORTBOT_SPEC_DIR: ${{ vars.SUPPORTBOT_SPEC_DIR || '.supportbot' }}
