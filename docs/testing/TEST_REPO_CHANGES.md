@@ -2,6 +2,9 @@
 
 ## ⚠️ CRITICAL: Apply These Changes First
 
+`BOT_GITHUB_TOKEN` was part of an older PAT-based setup. The current workflow
+should use the built-in `secrets.GITHUB_TOKEN` instead.
+
 Before the bot code changes will work, you must update your test repository workflow file.
 
 ### File to Edit
@@ -23,7 +26,7 @@ env:
   SUPPORTBOT_USERNAME: github-actions[bot]
 ```
 
-**Why:** Using a PAT makes the bot post as your account. Built-in `GITHUB_TOKEN` makes it post as "github-actions[bot]".
+**Why:** Using a PAT makes the bot post as your account and grants broader access than needed. Built-in `GITHUB_TOKEN` makes it post as `github-actions[bot]`.
 
 ---
 

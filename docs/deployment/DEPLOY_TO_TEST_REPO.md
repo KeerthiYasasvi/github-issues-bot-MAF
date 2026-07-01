@@ -11,10 +11,13 @@ To the test repo at:
 ## Secrets Already Configured ✓
 
 You've already added these to the test repo:
-- `BOT_GITHUB_TOKEN` (secret)
-- `API_KEY` (secret)
+- `OPENAI_API_KEY` or `API_KEY` (secret)
 - `PRIMARY_MODEL` (variable)
 - `SECONDARY_MODEL` (variable)
+
+No custom GitHub token secret is required. The workflow uses the built-in
+`secrets.GITHUB_TOKEN`, which is the safer default for posting as
+`github-actions[bot]`.
 
 ## Manual Steps
 

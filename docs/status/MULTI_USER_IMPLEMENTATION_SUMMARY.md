@@ -182,6 +182,9 @@ No changes needed to `EmbedState` / `ExtractState` - JSON serialization handles 
 
 **CRITICAL:** Before this code will work, you MUST update your test repository workflow.
 
+Historical note: `BOT_GITHUB_TOKEN` referred to an older PAT-based setup and
+should not be used in the current workflow.
+
 ### Required Changes in `yt-music-ELT-pipeline/.github/workflows/supportbot.yml`
 
 See: [docs/testing/TEST_REPO_CHANGES.md](docs/testing/TEST_REPO_CHANGES.md)
