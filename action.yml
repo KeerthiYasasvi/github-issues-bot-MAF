@@ -11,13 +11,13 @@ inputs:
     description: 'OpenAI API key for LLM access'
     required: true
   openai-model:
-    description: 'Primary OpenAI model (e.g., gpt-4o)'
+    description: 'Primary OpenAI model (e.g., gpt-5.4-mini)'
     required: false
-    default: 'gpt-4o'
+    default: 'gpt-5.4-mini'
   openai-critique-model:
-    description: 'Critique model for cost optimization (e.g., gpt-4o-mini)'
+    description: 'Critique model for cost optimization (e.g., gpt-5.4-nano)'
     required: false
-    default: 'gpt-4o-mini'
+    default: 'gpt-5.4-nano'
   github-token:
     description: 'GitHub token for API access'
     required: true

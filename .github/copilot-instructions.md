@@ -1,6 +1,6 @@
 # Repository Agent Instructions
 
-This repository must be maintained as a spec-driven and ontology-aware project.
+This repository must be maintained as a spec-driven and documentation-aware project.
 
 ## Required Behavior
 
@@ -12,15 +12,6 @@ When changing code, check whether these files need updates:
 - docs/architecture.md
 - docs/changelog.md
 - docs/decisions.md
-- ontology/project-map.yaml
-- ontology/architecture.yaml
-- ontology/agents.yaml
-- ontology/workflows.yaml
-- ontology/skills-map.yaml
-- ontology/interview-map.yaml
-- interview/pitch.md
-- interview/star-stories.md
-- interview/resume-bullets.md
 - evals/spec-consistency-eval.md
 
 ## Documentation Rule
@@ -33,20 +24,10 @@ code, commits, issues, tests, or specs.
 Implementation must trace back to a spec, task, or GitHub issue. If no spec exists,
 create or update one before implementing major features.
 
-## Ontology Rule
-
-When a new component, agent, workflow, data model, tool, or external dependency is
-added, update the ontology files.
-
-## Interview Rule
-
-If a change affects the project purpose, architecture, skills demonstrated, or
-measurable value, update the interview files.
-
 ## Evaluation Rule
 
-Before finalizing changes, check whether documentation, specs, ontology files, and
-interview material are consistent with the actual repository.
+Before finalizing changes, check whether documentation, specs, and evaluation
+material are consistent with the actual repository.
 
 ## Security Rule
 

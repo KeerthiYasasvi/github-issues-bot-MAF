@@ -33,6 +33,10 @@ state.json
 # Local test fixtures
 test-event.json
 
+# Non-project collateral
+interview/
+ontology/
+
 # Documentation files (except prompts and README.md)
 docs/
 *.md
@@ -55,12 +59,8 @@ docs/*
 !docs/setup.md
 !docs/changelog.md
 !docs/decisions.md
-!interview/
-!interview/**/*.md
 !evals/
 !evals/**/*.md
-!ontology/
-!ontology/**/*.yaml
 !specs/
 !specs/**/*.md
 

@@ -57,7 +57,7 @@ public static class Program
 
         Console.WriteLine($"[MAF] Runtime config: dry-run={dryRun}, write-mode={writeMode}");
 
-        // Create clients for dual-model setup (agents use gpt-4o, critics use gpt-4o-mini)
+        // Create clients for dual-model setup (primary model for generation, cheaper critique model for evaluation)
         ILlmClient agentLlmClient = CreateLlmClient(metrics, modelOverride: null);  // OPENAI_MODEL (primary)
         ILlmClient criticLlmClient = CreateLlmClient(metrics, modelOverride: Environment.GetEnvironmentVariable("OPENAI_CRITIQUE_MODEL"));  // OPENAI_CRITIQUE_MODEL (optional)
 

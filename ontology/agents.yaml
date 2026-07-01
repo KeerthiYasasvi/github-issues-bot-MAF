@@ -1,7 +1,0 @@
-agents: []
-
-collaboration_patterns: []
-
-guardrails:
-  - "Do not invent agent roles that are not implemented or explicitly planned."
-  - "Map each agent to concrete code, specs, or documented workflow evidence."

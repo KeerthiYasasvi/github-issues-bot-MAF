@@ -101,14 +101,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.API_KEY }}
-          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL }}
-          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL }}
+          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL || 'gpt-5.4-mini' }}
+          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL || 'gpt-5.4-nano' }}
           SUPPORTBOT_USERNAME: github-actions[bot]
 ```
 
 Configure repository:
 - **Secrets**: `API_KEY` (OpenAI API key)
-- **Variables**: `PRIMARY_MODEL` (gpt-4o), `SECONDARY_MODEL` (gpt-4o-mini)
+- **Variables**: `PRIMARY_MODEL` (gpt-5.4-mini), `SECONDARY_MODEL` (gpt-5.4-nano)
 
 ### Option B: Direct Deployment
 
@@ -120,7 +120,8 @@ cd github-issues-bot-MAF
 # Set environment variables
 export GITHUB_TOKEN="your-token"
 export OPENAI_API_KEY="your-key"
-export OPENAI_MODEL="gpt-4o"
+export OPENAI_MODEL="gpt-5.4-mini"
+export OPENAI_CRITIQUE_MODEL="gpt-5.4-nano"
 ```
 
 ## Local Development
@@ -170,7 +171,7 @@ Eval outputs: `artifacts/evals/eval_summary.json`
 |----------|----------|-------------|
 | `GITHUB_TOKEN` | Yes | GitHub API token |
 | `OPENAI_API_KEY` | Yes | OpenAI API key |
-| `OPENAI_MODEL` | Yes | Primary model (e.g., gpt-4o) |
+| `OPENAI_MODEL` | Yes | Primary model (e.g., gpt-5.4-mini) |
 | `OPENAI_CRITIQUE_MODEL` | No | Critic model (default: primary) |
 | `SUPPORTBOT_DRY_RUN` | No | Don't post to GitHub |
 | `SUPPORTBOT_WRITE_MODE` | No | Enable posting |

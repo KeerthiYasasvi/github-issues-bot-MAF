@@ -11,7 +11,7 @@ namespace SupportConcierge.Core.Modules.Agents;
 
 /// <summary>
 /// CriticAgent validates quality at each stage of the pipeline.
-/// Uses gpt-4o-mini for cost efficiency (evaluation only, not generation).
+/// Uses the cheaper critique model for evaluation only, not generation.
 /// Integrated at 3 stages: Triage, Research, and Response.
 /// 
 /// Key responsibility: Catch quality issues early rather than wasting downstream effort.

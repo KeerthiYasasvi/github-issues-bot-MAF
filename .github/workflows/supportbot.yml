@@ -31,8 +31,8 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || secrets.API_KEY }}
-          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL || 'gpt-4o' }}
-          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL || 'gpt-4o-mini' }}
+          OPENAI_MODEL: ${{ vars.PRIMARY_MODEL || 'gpt-5.4-mini' }}
+          OPENAI_CRITIQUE_MODEL: ${{ vars.SECONDARY_MODEL || 'gpt-5.4-nano' }}
           SUPPORTBOT_DRY_RUN: ${{ vars.SUPPORTBOT_DRY_RUN || 'false' }}
           SUPPORTBOT_WRITE_MODE: ${{ vars.SUPPORTBOT_WRITE_MODE || 'true' }}
           SUPPORTBOT_SPEC_DIR: ${{ vars.SUPPORTBOT_SPEC_DIR || '.supportbot' }}
